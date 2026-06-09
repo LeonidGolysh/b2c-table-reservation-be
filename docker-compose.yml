@@ -1,0 +1,32 @@
+services:
+  backend:
+    build: .
+    container_name: backend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_PASSWORD: postgres
+      DATABASE_NAME: mydb
+    volumes:
+      - .:/app
+      - /app/node_modules
+    
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mydb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgres/data
+
+volumes:
+  postgres_data:
