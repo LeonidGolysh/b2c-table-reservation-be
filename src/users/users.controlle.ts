@@ -20,6 +20,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ResponseUserDto } from './dto/response-user.dto';
+import { ErrorResponseDto } from 'src/common/dto/error-response.dto';
+import { ValidationErrorResponse } from 'src/common/dto/validation-error-response.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -35,13 +37,7 @@ export class UsersController {
   })
   @ApiBadRequestResponse({
     description: 'Validation failed',
-    schema: {
-      example: {
-        statusCode: 400,
-        message: ['email must be an email', 'password should be not empty'],
-        error: 'Bad Request',
-      },
-    },
+    type: ValidationErrorResponse,
   })
   @ApiConflictResponse({
     description: 'User already exists',
@@ -77,13 +73,7 @@ export class UsersController {
   })
   @ApiNotFoundResponse({
     description: 'User not found',
-    schema: {
-      example: {
-        statusCode: 404,
-        message: 'User with ID 123 not found',
-        error: 'Not Found',
-      },
-    },
+    type: ErrorResponseDto,
   })
   @Get(':id')
   findOne(@Param('id') id: string) {
@@ -98,13 +88,7 @@ export class UsersController {
   })
   @ApiNotFoundResponse({
     description: 'User not found',
-    schema: {
-      example: {
-        statusCode: 404,
-        message: 'User with ID 123 not found',
-        error: 'Not Found',
-      },
-    },
+    type: ErrorResponseDto,
   })
   @ApiConflictResponse({
     description: 'User already exists',
@@ -132,13 +116,7 @@ export class UsersController {
   })
   @ApiNotFoundResponse({
     description: 'User not found',
-    schema: {
-      example: {
-        statusCode: 404,
-        message: 'User with ID 123 not found',
-        error: 'Not Found',
-      },
-    },
+    type: ErrorResponseDto,
   })
   @Delete(':id')
   remove(@Param('id') id: string) {
