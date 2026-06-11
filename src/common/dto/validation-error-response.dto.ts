@@ -7,7 +7,7 @@ export class ValidationErrorResponse {
   statusCode: number;
 
   @ApiProperty({
-    example: ['email must be an email', 'password should not be empty'],
+    example: ['name should not be empty', 'name must be a string'],
   })
   message: string[];
 
