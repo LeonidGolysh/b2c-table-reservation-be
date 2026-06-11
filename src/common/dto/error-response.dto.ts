@@ -8,7 +8,7 @@ export class ErrorResponseDto {
   statusCode: number;
 
   @ApiProperty({
-    example: 'User with ID 1 not found',
+    example: 'Resource with ID 1 not found',
     description: 'Error message',
   })
   message: string;
