@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './user.entity';
 import { Repository } from 'typeorm';
@@ -7,6 +7,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
 import { ResponseUserDto } from './dto/response-user.dto';
 import { UserNotFountException } from './exceptions/user-not-found.exception';
+import { UserRole } from './user-role.enum';
 
 @Injectable()
 export class UsersService {
@@ -34,11 +35,24 @@ export class UsersService {
       phone_number: dto.phone_number,
       email: dto.email,
       password: hashedPassword,
+      role: dto.role ?? UserRole.USER,
     });
 
     const savedUser = await this.userRepository.save(user);
 
     return this.mapToResponse(savedUser);
+  }
+
+  async findByEmail(email: string) {
+    const user = await this.userRepository.findOne({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found with email: ', email);
+    }
+
+    return user;
   }
 
   async findAll(): Promise<ResponseUserDto[]> {
