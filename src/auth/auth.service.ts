@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { UsersService } from 'src/users/users.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ResponseAuthDto } from './dto/response-auth.dto';
 
 @Injectable()
 export class AuthService {
@@ -12,7 +13,7 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async register(dto: RegisterDto) {
+  async register(dto: RegisterDto): Promise<ResponseAuthDto> {
     await this.userService.create(dto);
 
     return this.login({
@@ -21,7 +22,7 @@ export class AuthService {
     });
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto): Promise<ResponseAuthDto> {
     const user = await this.userService.findByEmail(dto.email);
 
     if (!user) {
