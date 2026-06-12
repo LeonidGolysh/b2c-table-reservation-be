@@ -12,6 +12,7 @@ async function bootstrap() {
     .setTitle('B2C Reservation API')
     .setDescription('Restaurant table booking system')
     .setVersion('1.0')
+    .addBearerAuth()
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

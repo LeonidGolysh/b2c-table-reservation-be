@@ -73,6 +73,18 @@ export class UsersService {
     return this.mapToResponse(user);
   }
 
+  async findOneEntity(id: number) {
+    const user = await this.userRepository.findOne({
+      where: { id },
+    });
+
+    if (!user) {
+      throw new UserNotFountException(id);
+    }
+
+    return user;
+  }
+
   async update(id: number, dto: UpdateUserDto): Promise<ResponseUserDto> {
     await this.userRepository.update(id, dto);
 

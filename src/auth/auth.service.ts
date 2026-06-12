@@ -45,4 +45,16 @@ export class AuthService {
       access_token: this.jwtService.sign(payload),
     };
   }
+
+  async me(userId: number) {
+    const user = await this.userService.findOneEntity(userId);
+
+    return {
+      id: user.id,
+      name: user.name,
+      lastname: user.lastname,
+      phone_number: user.phone_number,
+      email: user.email,
+    };
+  }
 }
