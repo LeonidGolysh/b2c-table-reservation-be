@@ -10,6 +10,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { RestaurantAddresses } from './restaurant-addresses.entity';
+import { Review } from 'src/reviews/review.entity';
 
 @Entity('restaurants')
 export class Restaurant {
@@ -30,8 +31,17 @@ export class Restaurant {
   addresses: RestaurantAddresses[];
 
   @CreateDateColumn()
-  createdAr: Date;
+  createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @OneToMany(() => Review, (review) => review.restaurant)
+  reviews: Review[];
+
+  @Column({ type: 'float', default: 0 })
+  avgRating: number;
+
+  @Column({ type: 'int', default: 0 })
+  ratingCount: number;
 }
