@@ -6,11 +6,13 @@ import {
   JoinColumn,
   ManyToOne,
   OneToMany,
+  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { RestaurantAddresses } from './restaurant-addresses.entity';
 import { Review } from 'src/reviews/review.entity';
+import { Subscription } from 'src/subscriptions/subscription.entity';
 
 @Entity('restaurants')
 export class Restaurant {
@@ -44,4 +46,10 @@ export class Restaurant {
 
   @Column({ type: 'int', default: 0 })
   ratingCount: number;
+
+  @OneToOne(() => Subscription, (s) => s.restaurant)
+  subscriptions: Subscription[];
+
+  @Column({ default: false })
+  isActive: boolean;
 }

@@ -8,17 +8,23 @@ import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
 import { UserRole } from 'src/users/user-role.enum';
 import { RestaurantNorFoundException } from './exceptions/restaurant-not-found.exception';
 import { ResponseRestaurantDto } from './dto/response-restaurant.dto';
+import { SubscriptionsService } from 'src/subscriptions/subscriptions.service';
+import { DataSource } from 'typeorm';
 
 export class RestaurantsService {
   constructor(
     @InjectRepository(Restaurant)
-    private readonly restaurantRepository: Repository<Restaurant>,
+    private restaurantRepository: Repository<Restaurant>,
 
     @InjectRepository(RestaurantAddresses)
-    private readonly addressesRepository: Repository<RestaurantAddresses>,
+    private addressesRepository: Repository<RestaurantAddresses>,
 
     @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    private userRepository: Repository<User>,
+
+    private readonly subscriptionService: SubscriptionsService,
+
+    private readonly dataSource: DataSource,
   ) {}
 
   private mapToResponse(restaurant: Restaurant): ResponseRestaurantDto {
@@ -26,6 +32,7 @@ export class RestaurantsService {
       id: restaurant.id,
       name: restaurant.name,
       description: restaurant.description,
+      isActive: restaurant.isActive,
 
       owner: {
         id: restaurant.owner.id,
@@ -61,24 +68,34 @@ export class RestaurantsService {
       throw new Error('Invalid owner');
     }
 
-    const restaurant = this.restaurantRepository.create({
-      name: dto.name,
-      description: dto.description,
-      owner,
+    const savedId = await this.dataSource.transaction(async (manager) => {
+      const restaurant = this.restaurantRepository.create({
+        name: dto.name,
+        description: dto.description,
+        owner,
+      });
+
+      const savedRestaurant = await manager.save(restaurant);
+
+      await this.subscriptionService.createForRestaurant(
+        savedRestaurant,
+        dto.plan,
+        manager,
+      );
+
+      const addresses = dto.addresses.map((address) =>
+        this.addressesRepository.create({
+          ...address,
+          restaurant: savedRestaurant,
+        }),
+      );
+
+      await manager.save(addresses);
+
+      return savedRestaurant.id;
     });
 
-    const savedRestaurant = await this.restaurantRepository.save(restaurant);
-
-    const addresses = dto.addresses.map((address) =>
-      this.addressesRepository.create({
-        ...address,
-        restaurant: savedRestaurant,
-      }),
-    );
-
-    await this.addressesRepository.save(addresses);
-
-    return this.findOne(savedRestaurant.id);
+    return this.findOne(savedId);
   }
 
   async findAll(): Promise<ResponseRestaurantDto[]> {

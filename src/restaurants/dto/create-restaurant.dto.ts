@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -9,6 +10,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { CreateRestaurantAddressesDto } from './create-restaurant-addresses.dto';
+import { SubscriptionPlan } from 'src/subscriptions/enum/subscription-plan.enum';
 
 export class CreateRestaurantDto {
   @ApiProperty({ example: 'Burger House' })
@@ -24,6 +26,13 @@ export class CreateRestaurantDto {
   @ApiProperty({ example: 1 })
   @IsNumber()
   owner_id: number;
+
+  @ApiProperty({
+    enum: SubscriptionPlan,
+    example: SubscriptionPlan.TST,
+  })
+  @IsEnum(SubscriptionPlan)
+  plan: SubscriptionPlan;
 
   @ApiProperty({ type: CreateRestaurantAddressesDto, isArray: true })
   @IsArray()
