@@ -17,4 +17,7 @@ export class ResponseRestaurantDto {
 
   @ApiProperty({ type: ResponseRestaurantAddressDto, isArray: true })
   addresses: ResponseRestaurantAddressDto[];
+
+  @ApiProperty({ example: false })
+  isActive: boolean;
 }
