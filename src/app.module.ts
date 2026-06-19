@@ -6,6 +6,7 @@ import { RestaurantsModule } from './restaurants/restaurants.module';
 import { AuthModule } from './auth/auth.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { StripeModule } from './stripe/stripe.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
     RestaurantsModule,
     ReviewsModule,
     SubscriptionsModule,
+    StripeModule,
   ],
 })
 export class AppModule {}

@@ -48,7 +48,7 @@ export class Restaurant {
   ratingCount: number;
 
   @OneToOne(() => Subscription, (s) => s.restaurant)
-  subscriptions: Subscription[];
+  subscriptions: Subscription;
 
   @Column({ default: false })
   isActive: boolean;
