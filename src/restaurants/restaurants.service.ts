@@ -10,6 +10,9 @@ import { RestaurantNorFoundException } from './exceptions/restaurant-not-found.e
 import { ResponseRestaurantDto } from './dto/response-restaurant.dto';
 import { SubscriptionsService } from 'src/subscriptions/subscriptions.service';
 import { DataSource } from 'typeorm';
+import { StripeService } from 'src/stripe/stripe.service';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { SubscriptionStatus } from 'src/subscriptions/enum/subscription-status.enum';
 
 export class RestaurantsService {
   constructor(
@@ -23,8 +26,8 @@ export class RestaurantsService {
     private userRepository: Repository<User>,
 
     private readonly subscriptionService: SubscriptionsService,
-
     private readonly dataSource: DataSource,
+    private readonly stripeService: StripeService,
   ) {}
 
   private mapToResponse(restaurant: Restaurant): ResponseRestaurantDto {
@@ -138,6 +141,39 @@ export class RestaurantsService {
 
     return {
       message: 'Restaurant deleted successfully',
+    };
+  }
+
+  async checkout(restaurantId: number) {
+    const restaurant = await this.restaurantRepository.findOne({
+      where: { id: restaurantId },
+      relations: {
+        subscriptions: {
+          restaurant: {
+            owner: true,
+          },
+        },
+      },
+    });
+
+    if (!restaurant) {
+      throw new NotFoundException('Restaurant not found');
+    }
+
+    if (!restaurant.subscriptions) {
+      throw new NotFoundException('Subscription not found');
+    }
+
+    if (restaurant.subscriptions.status !== SubscriptionStatus.PEN) {
+      throw new BadRequestException('Subscription is already paid');
+    }
+
+    const session = await this.stripeService.createCheckoutSession(
+      restaurant.subscriptions,
+    );
+
+    return {
+      checkoutUrl: session.url,
     };
   }
 }

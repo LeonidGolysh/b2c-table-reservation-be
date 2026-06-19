@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseIntPipe,
   Post,
   Put,
 } from '@nestjs/common';
@@ -114,5 +115,10 @@ export class RestaurantsController {
   @Delete(':id')
   remove(@Param('id') id: string): Promise<{ message: string }> {
     return this.restaurantsService.remove(+id);
+  }
+
+  @Post(':id/checkout')
+  checkout(@Param('id', ParseIntPipe) id: number) {
+    return this.restaurantsService.checkout(id);
   }
 }
