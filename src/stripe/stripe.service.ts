@@ -5,6 +5,7 @@ import { SubscriptionPlan } from 'src/subscriptions/enum/subscription-plan.enum'
 import { Subscription } from 'src/subscriptions/subscription.entity';
 import { SubscriptionsService } from 'src/subscriptions/subscriptions.service';
 import { Repository } from 'typeorm';
+import { StripeEvent } from './stripe-event.entity';
 
 @Injectable()
 export class StripeService {
@@ -13,6 +14,9 @@ export class StripeService {
   constructor(
     @InjectRepository(Subscription)
     private subscriptionRepo: Repository<Subscription>,
+
+    @InjectRepository(StripeEvent)
+    private stripeEvent: Repository<StripeEvent>,
 
     private readonly subscriptionService: SubscriptionsService,
   ) {
@@ -70,7 +74,7 @@ export class StripeService {
 
     switch (event.type) {
       case 'checkout.session.completed':
-        await this.handleCheckoutCompleted(event.data.object);
+        await this.handleCheckoutSessionCompleted(event);
         break;
 
       default:
@@ -82,6 +86,32 @@ export class StripeService {
     };
   }
 
+  private async handleCheckoutSessionCompleted(event: Stripe.Event) {
+    if (await this.isProcessed(event.id)) {
+      return;
+    }
+
+    const session = event.data.object as Stripe.Checkout.Session;
+
+    await this.handleCheckoutCompleted(session);
+    await this.markAsProcessed(event);
+  }
+
+  private async isProcessed(eventId: string): Promise<boolean> {
+    const exists = await this.stripeEvent.findOne({
+      where: { stripeEventId: eventId },
+    });
+
+    return !!exists;
+  }
+
+  private async markAsProcessed(event: Stripe.Event) {
+    await this.stripeEvent.save({
+      stripeEventId: event.id,
+      type: event.type,
+    });
+  }
+
   private async handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     const subscriptionId = session.metadata?.subscriptionId;
 
@@ -89,7 +119,7 @@ export class StripeService {
       throw new Error('No subscriptionId in metadata');
     }
 
-    this.subscriptionService.activeSubscription(Number(subscriptionId));
+    await this.subscriptionService.activeSubscription(Number(subscriptionId));
   }
 
   async testConnection() {
