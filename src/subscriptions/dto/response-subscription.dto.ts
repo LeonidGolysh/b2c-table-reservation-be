@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { SubscriptionRenewalType } from '../enum/subscription-renewal-type.enum';
 
 export class ResponseSubscriptionDto {
   @ApiProperty()
@@ -15,4 +16,7 @@ export class ResponseSubscriptionDto {
 
   @ApiProperty()
   createdAt: Date;
+
+  @ApiProperty({ enum: SubscriptionRenewalType })
+  renewalType: SubscriptionRenewalType;
 }

@@ -20,4 +20,7 @@ export class ResponseRestaurantDto {
 
   @ApiProperty({ example: false })
   isActive: boolean;
+
+  @ApiProperty({ example: 'MNL' })
+  renewalType: string;
 }
