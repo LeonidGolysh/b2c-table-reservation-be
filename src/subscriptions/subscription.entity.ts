@@ -5,12 +5,14 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { SubscriptionStatus } from './enum/subscription-status.enum';
 import { SubscriptionPlan } from './enum/subscription-plan.enum';
+import { Payment } from 'src/payments/payment.entity';
 
 @Entity('subscriptions')
 export class Subscription {
@@ -47,4 +49,7 @@ export class Subscription {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @OneToMany(() => Payment, (payments) => payments.subscription)
+  payments: Payment[];
 }

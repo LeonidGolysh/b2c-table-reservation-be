@@ -13,6 +13,7 @@ import {
 import { RestaurantAddresses } from './restaurant-addresses.entity';
 import { Review } from 'src/reviews/review.entity';
 import { Subscription } from 'src/subscriptions/subscription.entity';
+import { Payment } from 'src/payments/payment.entity';
 
 @Entity('restaurants')
 export class Restaurant {
@@ -52,4 +53,7 @@ export class Restaurant {
 
   @Column({ default: false })
   isActive: boolean;
+
+  @OneToMany(() => Payment, (payment) => payment.restaurant)
+  payments: Payment[];
 }

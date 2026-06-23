@@ -6,6 +6,7 @@ import { Subscription } from 'src/subscriptions/subscription.entity';
 import { SubscriptionsService } from 'src/subscriptions/subscriptions.service';
 import { Repository } from 'typeorm';
 import { StripeEvent } from './stripe-event.entity';
+import { PaymentService } from 'src/payments/payments.service';
 
 @Injectable()
 export class StripeService {
@@ -19,6 +20,7 @@ export class StripeService {
     private stripeEvent: Repository<StripeEvent>,
 
     private readonly subscriptionService: SubscriptionsService,
+    private readonly paymentService: PaymentService,
   ) {
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
       apiVersion: '2026-05-27.dahlia',
@@ -42,7 +44,7 @@ export class StripeService {
   async createCheckoutSession(
     subscription: Subscription,
   ): Promise<Stripe.Checkout.Session> {
-    const session = this.client.checkout.sessions.create({
+    const session = await this.client.checkout.sessions.create({
       mode: 'subscription',
 
       line_items: [
@@ -119,6 +121,7 @@ export class StripeService {
       throw new Error('No subscriptionId in metadata');
     }
 
+    await this.paymentService.createFromStripe(session);
     await this.subscriptionService.activeSubscription(Number(subscriptionId));
   }
 
