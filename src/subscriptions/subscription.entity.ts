@@ -13,6 +13,7 @@ import {
 import { SubscriptionStatus } from './enum/subscription-status.enum';
 import { SubscriptionPlan } from './enum/subscription-plan.enum';
 import { Payment } from 'src/payments/payment.entity';
+import { SubscriptionRenewalType } from './enum/subscription-renewal-type.enum';
 
 @Entity('subscriptions')
 export class Subscription {
@@ -52,4 +53,12 @@ export class Subscription {
 
   @OneToMany(() => Payment, (payments) => payments.subscription)
   payments: Payment[];
+
+  @Column({
+    name: 'renewal_type',
+    type: 'enum',
+    enum: SubscriptionRenewalType,
+    default: SubscriptionRenewalType.MANUAL,
+  })
+  renewalType: SubscriptionRenewalType;
 }

@@ -6,6 +6,7 @@ import { Restaurant } from 'src/restaurants/entity/restaurant.entity';
 import { SubscriptionStatus } from './enum/subscription-status.enum';
 import { ResponseSubscriptionDto } from './dto/response-subscription.dto';
 import { SubscriptionPlan } from './enum/subscription-plan.enum';
+import { SubscriptionRenewalType } from './enum/subscription-renewal-type.enum';
 
 @Injectable()
 export class SubscriptionsService {
@@ -24,6 +25,7 @@ export class SubscriptionsService {
       startDate: subscription.startDate,
       endDate: subscription.endDate,
       createdAt: subscription.createdAt,
+      renewalType: subscription.renewalType,
     };
   }
 
@@ -42,6 +44,7 @@ export class SubscriptionsService {
   async createForRestaurant(
     restaurant: Restaurant,
     plan: SubscriptionPlan,
+    renewalType?: SubscriptionRenewalType,
     manager?: EntityManager,
   ) {
     const startDate = new Date();
@@ -67,6 +70,7 @@ export class SubscriptionsService {
       status: SubscriptionStatus.PEN,
       startDate,
       endDate,
+      ...(renewalType && { renewalType }),
     });
 
     return repo.save(subscription);

@@ -58,6 +58,7 @@ export class StripeService {
         subscriptionId: subscription.id.toString(),
         restaurantId: subscription.restaurant.id.toString(),
         ownerId: subscription.restaurant.owner.id.toString(),
+        renewalType: subscription.renewalType,
       },
 
       success_url: 'http://localhost:3000/payment/success',

@@ -11,6 +11,7 @@ import {
 } from 'class-validator';
 import { CreateRestaurantAddressesDto } from './create-restaurant-addresses.dto';
 import { SubscriptionPlan } from 'src/subscriptions/enum/subscription-plan.enum';
+import { SubscriptionRenewalType } from 'src/subscriptions/enum/subscription-renewal-type.enum';
 
 export class CreateRestaurantDto {
   @ApiProperty({ example: 'Burger House' })
@@ -39,4 +40,11 @@ export class CreateRestaurantDto {
   @ValidateNested({ each: true })
   @Type(() => CreateRestaurantAddressesDto)
   addresses: CreateRestaurantAddressesDto[];
+
+  @ApiProperty({
+    enum: SubscriptionRenewalType,
+    example: SubscriptionRenewalType.MANUAL,
+  })
+  @IsEnum(SubscriptionRenewalType)
+  renewalType: SubscriptionRenewalType;
 }

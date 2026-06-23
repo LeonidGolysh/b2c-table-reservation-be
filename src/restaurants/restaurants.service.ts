@@ -36,6 +36,7 @@ export class RestaurantsService {
       name: restaurant.name,
       description: restaurant.description,
       isActive: restaurant.isActive,
+      renewalType: restaurant.subscriptions.renewalType,
 
       owner: {
         id: restaurant.owner.id,
@@ -83,6 +84,7 @@ export class RestaurantsService {
       await this.subscriptionService.createForRestaurant(
         savedRestaurant,
         dto.plan,
+        dto.renewalType,
         manager,
       );
 
@@ -106,6 +108,7 @@ export class RestaurantsService {
       relations: {
         owner: true,
         addresses: true,
+        subscriptions: true,
       },
     });
 
@@ -118,6 +121,7 @@ export class RestaurantsService {
       relations: {
         owner: true,
         addresses: true,
+        subscriptions: true,
       },
     });
 
@@ -156,21 +160,22 @@ export class RestaurantsService {
       },
     });
 
+    const subscription = restaurant?.subscriptions;
+
     if (!restaurant) {
       throw new NotFoundException('Restaurant not found');
     }
 
-    if (!restaurant.subscriptions) {
+    if (!subscription) {
       throw new NotFoundException('Subscription not found');
     }
 
-    if (restaurant.subscriptions.status !== SubscriptionStatus.PEN) {
+    if (subscription.status !== SubscriptionStatus.PEN) {
       throw new BadRequestException('Subscription is already paid');
     }
 
-    const session = await this.stripeService.createCheckoutSession(
-      restaurant.subscriptions,
-    );
+    const session =
+      await this.stripeService.createCheckoutSession(subscription);
 
     return {
       checkoutUrl: session.url,
