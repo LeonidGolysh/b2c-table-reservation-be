@@ -67,7 +67,7 @@ export class SubscriptionsService {
     const subscription = repo.create({
       restaurant,
       plan,
-      status: SubscriptionStatus.PEN,
+      status: SubscriptionStatus.PENDING,
       startDate,
       endDate,
       ...(renewalType && { renewalType }),
@@ -86,7 +86,7 @@ export class SubscriptionsService {
       throw new NotFoundException('Subscription not found');
     }
 
-    subscription.status = SubscriptionStatus.ACT;
+    subscription.status = SubscriptionStatus.ACTIVE;
     subscription.restaurant.isActive = true;
 
     await this.restaurantRepository.save(subscription.restaurant);
@@ -103,10 +103,29 @@ export class SubscriptionsService {
       throw new NotFoundException('Subscription not found');
     }
 
-    subscription.status = SubscriptionStatus.EXP;
+    subscription.status = SubscriptionStatus.EXPIRED;
     subscription.restaurant.isActive = false;
 
     await this.restaurantRepository.save(subscription.restaurant);
     return this.subscriptionRepo.save(subscription);
+  }
+
+  async checkoutExpired(subscriptionId: number) {
+    const subscription = await this.subscriptionRepo.findOne({
+      where: { id: subscriptionId },
+      relations: { restaurant: true },
+    });
+
+    if (!subscription) {
+      throw new NotFoundException('Subscription not found');
+    }
+
+    if (subscription.status !== SubscriptionStatus.CHECKOUT) {
+      return;
+    }
+
+    subscription.status = SubscriptionStatus.PENDING;
+
+    await this.subscriptionRepo.save(subscription);
   }
 }

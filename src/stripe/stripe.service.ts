@@ -44,6 +44,7 @@ export class StripeService {
   async createCheckoutSession(
     subscription: Subscription,
   ): Promise<Stripe.Checkout.Session> {
+    const expiresAt = Math.floor(Date.now() / 1000) + 30 * 60;
     const session = await this.client.checkout.sessions.create({
       mode: 'subscription',
 
@@ -60,6 +61,8 @@ export class StripeService {
         ownerId: subscription.restaurant.owner.id.toString(),
         renewalType: subscription.renewalType,
       },
+
+      expires_at: expiresAt,
 
       success_url: 'http://localhost:3000/payment/success',
       cancel_url: 'http://localhost:3000/payment/cancel',
@@ -80,6 +83,10 @@ export class StripeService {
         await this.handleCheckoutSessionCompleted(event);
         break;
 
+      case 'checkout.session.expired':
+        await this.handleCheckoutSessionExpired(event);
+        break;
+
       default:
         console.log(event.type);
     }
@@ -95,9 +102,24 @@ export class StripeService {
     }
 
     const session = event.data.object as Stripe.Checkout.Session;
+    const inserted = await this.markAsProcessed(event);
+
+    if (!inserted) {
+      return;
+    }
 
     await this.handleCheckoutCompleted(session);
-    await this.markAsProcessed(event);
+  }
+
+  private async handleCheckoutSessionExpired(event: Stripe.Event) {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const subscriptionId = Number(session.metadata?.subscriptionId);
+
+    if (!subscriptionId) {
+      return;
+    }
+
+    await this.subscriptionService.checkoutExpired(subscriptionId);
   }
 
   private async isProcessed(eventId: string): Promise<boolean> {
@@ -109,10 +131,18 @@ export class StripeService {
   }
 
   private async markAsProcessed(event: Stripe.Event) {
-    await this.stripeEvent.save({
-      stripeEventId: event.id,
-      type: event.type,
-    });
+    const result = await this.stripeEvent
+      .createQueryBuilder()
+      .insert()
+      .into(StripeEvent)
+      .values({
+        stripeEventId: event.id,
+        type: event.type,
+      })
+      .orIgnore()
+      .execute();
+
+    return result.identifiers.length > 0;
   }
 
   private async handleCheckoutCompleted(session: Stripe.Checkout.Session) {

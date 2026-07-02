@@ -13,6 +13,7 @@ import { DataSource } from 'typeorm';
 import { StripeService } from 'src/stripe/stripe.service';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { SubscriptionStatus } from 'src/subscriptions/enum/subscription-status.enum';
+import { Subscription } from 'src/subscriptions/subscription.entity';
 
 export class RestaurantsService {
   constructor(
@@ -24,6 +25,9 @@ export class RestaurantsService {
 
     @InjectRepository(User)
     private userRepository: Repository<User>,
+
+    @InjectRepository(Subscription)
+    private subscriptionRepo: Repository<Subscription>,
 
     private readonly subscriptionService: SubscriptionsService,
     private readonly dataSource: DataSource,
@@ -170,9 +174,17 @@ export class RestaurantsService {
       throw new NotFoundException('Subscription not found');
     }
 
-    if (subscription.status !== SubscriptionStatus.PEN) {
-      throw new BadRequestException('Subscription is already paid');
+    if (
+      subscription.status === SubscriptionStatus.CHECKOUT ||
+      subscription.status === SubscriptionStatus.ACTIVE
+    ) {
+      throw new BadRequestException(
+        'Subscription is already in checkout or active',
+      );
     }
+
+    subscription.status = SubscriptionStatus.CHECKOUT;
+    await this.subscriptionRepo.save(subscription);
 
     const session =
       await this.stripeService.createCheckoutSession(subscription);
