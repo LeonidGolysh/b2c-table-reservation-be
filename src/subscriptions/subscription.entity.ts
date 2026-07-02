@@ -4,7 +4,6 @@ import {
   CreateDateColumn,
   Entity,
   JoinColumn,
-  ManyToOne,
   OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
@@ -29,7 +28,7 @@ export class Subscription {
   @Column({
     type: 'enum',
     enum: SubscriptionStatus,
-    default: SubscriptionStatus.PEN,
+    default: SubscriptionStatus.PENDING,
   })
   status: SubscriptionStatus;
 

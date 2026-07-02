@@ -1,10 +1,6 @@
 export enum SubscriptionStatus {
-  //Pending
-  PEN = 'PEN',
-
-  //Active
-  ACT = 'ACT',
-
-  //Expired
-  EXP = 'EXP',
+  PENDING = 'PEN',
+  CHECKOUT = 'CHK',
+  ACTIVE = 'ACT',
+  EXPIRED = 'EXP',
 }
