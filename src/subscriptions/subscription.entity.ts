@@ -60,4 +60,10 @@ export class Subscription {
     default: SubscriptionRenewalType.MANUAL,
   })
   renewalType: SubscriptionRenewalType;
+
+  @Column({ nullable: true })
+  stripeCustomerId: string;
+
+  @Column({ nullable: true })
+  stripeSubscriptionId: string;
 }

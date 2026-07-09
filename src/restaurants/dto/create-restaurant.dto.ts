@@ -30,7 +30,7 @@ export class CreateRestaurantDto {
 
   @ApiProperty({
     enum: SubscriptionPlan,
-    example: SubscriptionPlan.TST,
+    example: SubscriptionPlan.TEST,
   })
   @IsEnum(SubscriptionPlan)
   plan: SubscriptionPlan;

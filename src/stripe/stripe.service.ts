@@ -29,16 +29,27 @@ export class StripeService {
 
   private getPriceId(plan: SubscriptionPlan): string {
     switch (plan) {
-      case SubscriptionPlan.TST:
+      case SubscriptionPlan.TEST:
         return process.env.STRIPE_PRICE_TEST!;
 
-      case SubscriptionPlan.MTH:
+      case SubscriptionPlan.MONTHLY:
         return process.env.STRIPE_PRICE_MONTH!;
     }
   }
 
   get client(): Stripe {
     return this.stripe;
+  }
+
+  private async getSubscriptionPeriodEnd(
+    stripeSubscriptionId: string,
+  ): Promise<Date | undefined> {
+    const stripeSubscription =
+      await this.client.subscriptions.retrieve(stripeSubscriptionId);
+    const periodEndSeconds =
+      stripeSubscription.items.data[0]?.current_period_end;
+
+    return periodEndSeconds ? new Date(periodEndSeconds * 1000) : undefined;
   }
 
   async createCheckoutSession(
@@ -85,6 +96,14 @@ export class StripeService {
 
       case 'checkout.session.expired':
         await this.handleCheckoutSessionExpired(event);
+        break;
+
+      case 'invoice.payment_succeeded':
+        await this.handleInvoicePaid(event);
+        break;
+
+      case 'invoice.payment_failed':
+        await this.handleInvoicePaymentFailed(event);
         break;
 
       default:
@@ -152,11 +171,75 @@ export class StripeService {
       throw new Error('No subscriptionId in metadata');
     }
 
-    await this.paymentService.createFromStripe(session);
-    await this.subscriptionService.activeSubscription(Number(subscriptionId));
+    const stripeCustomerId = session.customer as string;
+    const stripeSubscriptionId = session.subscription as string;
+
+    await this.subscriptionService.attachStripeData(
+      Number(subscriptionId),
+      stripeCustomerId,
+      stripeSubscriptionId,
+    );
+
+    const stripePeriodEnd =
+      await this.getSubscriptionPeriodEnd(stripeSubscriptionId);
+
+    await this.paymentService.createFromCheckout(session);
+    await this.subscriptionService.activeSubscription(
+      Number(subscriptionId),
+      stripePeriodEnd,
+    );
   }
 
   async testConnection() {
     return this.client.balance.retrieve();
+  }
+
+  private async handleInvoicePaid(event: Stripe.Event) {
+    const invoice = event.data.object as any;
+    const stripeSubscriptionId = invoice.parent?.subscription_details
+      ?.subscription as string;
+
+    if (invoice.billing_reason === 'subscription_create') {
+      return;
+    }
+
+    const subscription =
+      await this.subscriptionService.findByStripeSubscriptionId(
+        stripeSubscriptionId,
+      );
+
+    if (!subscription) {
+      return;
+    }
+
+    const stripePeriodEnd =
+      await this.getSubscriptionPeriodEnd(stripeSubscriptionId);
+
+    await this.paymentService.createFromInvoice(invoice);
+    await this.subscriptionService.renewSubscription(
+      subscription.id,
+      stripePeriodEnd,
+    );
+  }
+
+  private async handleInvoicePaymentFailed(event: Stripe.Event) {
+    const invoice = event.data.object as any;
+    const stripeSubscriptionId = invoice.parent?.subscription_details
+      ?.subscription as string;
+
+    if (invoice.billing_reason === 'subscription_create') {
+      return;
+    }
+
+    const subscription =
+      await this.subscriptionService.findByStripeSubscriptionId(
+        stripeSubscriptionId,
+      );
+
+    if (!subscription) {
+      return;
+    }
+
+    await this.subscriptionService.expireSubscription(subscription.id);
   }
 }

@@ -31,6 +31,12 @@ export class Payment {
   @Column({ name: 'stripe_payment_intent_id', nullable: true })
   stripePaymentIntentId!: string;
 
+  @Column({ name: 'stripe_invoice_id', nullable: true })
+  stripeInvoiceId!: string;
+
+  @Column({ name: 'stripe-subscription_id', nullable: true })
+  stripeSubscriptionId!: string;
+
   @Column({ type: 'int', default: 0 })
   amount!: number;
 
