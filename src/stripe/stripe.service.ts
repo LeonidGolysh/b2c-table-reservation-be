@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import Stripe from 'node_modules/stripe/esm/stripe.esm.node';
 import { SubscriptionPlan } from 'src/subscriptions/enum/subscription-plan.enum';
@@ -13,9 +13,6 @@ export class StripeService {
   private readonly stripe: Stripe;
 
   constructor(
-    @InjectRepository(Subscription)
-    private subscriptionRepo: Repository<Subscription>,
-
     @InjectRepository(StripeEvent)
     private stripeEvent: Repository<StripeEvent>,
 
@@ -168,7 +165,7 @@ export class StripeService {
     const subscriptionId = session.metadata?.subscriptionId;
 
     if (!subscriptionId) {
-      throw new Error('No subscriptionId in metadata');
+      throw new BadRequestException('No subscriptionId in metadata');
     }
 
     const stripeCustomerId = session.customer as string;

@@ -1,14 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Subscription } from './subscription.entity';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, FindOptionsRelations, Repository } from 'typeorm';
 import { Restaurant } from 'src/restaurants/entity/restaurant.entity';
+import { RestaurantsService } from 'src/restaurants/restaurants.service';
 import { SubscriptionStatus } from './enum/subscription-status.enum';
 import { ResponseSubscriptionDto } from './dto/response-subscription.dto';
 import { SubscriptionPlan } from './enum/subscription-plan.enum';
 import { SubscriptionRenewalType } from './enum/subscription-renewal-type.enum';
 import { SubscriptionQueueService } from './subscription.queue.service';
 import { AUTO_RENEWAL_GRACE_PERIOD_MS } from './subscription.constant';
+import { SubscriptionNotFoundException } from './exceptions/subscription-not-found.exception';
 
 @Injectable()
 export class SubscriptionsService {
@@ -16,8 +23,8 @@ export class SubscriptionsService {
     @InjectRepository(Subscription)
     private subscriptionRepo: Repository<Subscription>,
 
-    @InjectRepository(Restaurant)
-    private restaurantRepository: Repository<Restaurant>,
+    @Inject(forwardRef(() => RestaurantsService))
+    private readonly restaurantsService: RestaurantsService,
 
     private readonly subscriptionQueueService: SubscriptionQueueService,
   ) {}
@@ -33,14 +40,45 @@ export class SubscriptionsService {
     };
   }
 
-  async create(restaurantId: number, plan: SubscriptionPlan) {
-    const restaurant = await this.restaurantRepository.findOne({
-      where: { id: restaurantId },
+  private async findByIdOrThrow(
+    id: number,
+    relations?: FindOptionsRelations<Subscription>,
+  ): Promise<Subscription> {
+    const subscription = await this.subscriptionRepo.findOne({
+      where: { id },
+      ...(relations && { relations }),
     });
 
-    if (!restaurant) {
-      throw new NotFoundException('Restaurant not found');
+    if (!subscription) {
+      throw new SubscriptionNotFoundException(id);
     }
+
+    return subscription;
+  }
+
+  private computeEndDate(
+    startDate: Date,
+    plan: SubscriptionPlan,
+    testDurationMinutes: number,
+  ): Date {
+    const endDate = new Date(startDate);
+
+    switch (plan) {
+      case SubscriptionPlan.TEST:
+        endDate.setMinutes(endDate.getMinutes() + testDurationMinutes);
+        break;
+
+      case SubscriptionPlan.MONTHLY:
+        endDate.setMonth(endDate.getMonth() + 1);
+        break;
+    }
+
+    return endDate;
+  }
+
+  async create(restaurantId: number, plan: SubscriptionPlan) {
+    const restaurant =
+      await this.restaurantsService.findOneEntity(restaurantId);
 
     return this.createForRestaurant(restaurant, plan);
   }
@@ -52,17 +90,7 @@ export class SubscriptionsService {
     manager?: EntityManager,
   ) {
     const startDate = new Date();
-    const endDate = new Date(startDate);
-
-    switch (plan) {
-      case SubscriptionPlan.TEST:
-        endDate.setMinutes(endDate.getMinutes() + 3);
-        break;
-
-      case SubscriptionPlan.MONTHLY:
-        endDate.setMonth(endDate.getMonth() + 1);
-        break;
-    }
+    const endDate = this.computeEndDate(startDate, plan, 3);
 
     const repo = manager
       ? manager.getRepository(Subscription)
@@ -125,14 +153,9 @@ export class SubscriptionsService {
   }
 
   async activeSubscription(subscriptionId: number, stripePeriodEnd?: Date) {
-    const subscription = await this.subscriptionRepo.findOne({
-      where: { id: subscriptionId },
-      relations: { restaurant: true },
+    const subscription = await this.findByIdOrThrow(subscriptionId, {
+      restaurant: true,
     });
-
-    if (!subscription) {
-      throw new NotFoundException('Subscription not found');
-    }
 
     subscription.status = SubscriptionStatus.ACTIVE;
     subscription.restaurant.isActive = true;
@@ -141,7 +164,7 @@ export class SubscriptionsService {
       subscription.endDate = stripePeriodEnd;
     }
 
-    await this.restaurantRepository.save(subscription.restaurant);
+    await this.restaurantsService.setActive(subscription.restaurant.id, true);
 
     const savedSubScription = await this.subscriptionRepo.save(subscription);
     const delay = this.getExpirationDelay(savedSubScription);
@@ -159,14 +182,9 @@ export class SubscriptionsService {
   }
 
   async expireSubscription(subscriptionId: number) {
-    const subscription = await this.subscriptionRepo.findOne({
-      where: { id: subscriptionId },
-      relations: { restaurant: true },
+    const subscription = await this.findByIdOrThrow(subscriptionId, {
+      restaurant: true,
     });
-
-    if (!subscription) {
-      throw new NotFoundException('Subscription not found');
-    }
 
     await this.subscriptionQueueService.cancelRenewal(subscription.id);
 
@@ -177,19 +195,12 @@ export class SubscriptionsService {
     subscription.status = SubscriptionStatus.EXPIRED;
     subscription.restaurant.isActive = false;
 
-    await this.restaurantRepository.save(subscription.restaurant);
+    await this.restaurantsService.setActive(subscription.restaurant.id, false);
     return this.subscriptionRepo.save(subscription);
   }
 
   async checkoutExpired(subscriptionId: number) {
-    const subscription = await this.subscriptionRepo.findOne({
-      where: { id: subscriptionId },
-      relations: { restaurant: true },
-    });
-
-    if (!subscription) {
-      throw new NotFoundException('Subscription not found');
-    }
+    const subscription = await this.findByIdOrThrow(subscriptionId);
 
     if (subscription.status !== SubscriptionStatus.CHECKOUT) {
       return;
@@ -205,13 +216,7 @@ export class SubscriptionsService {
     customerId: string,
     stripeSubscriptionId: string,
   ) {
-    const subscription = await this.subscriptionRepo.findOne({
-      where: { id: subscriptionId },
-    });
-
-    if (!subscription) {
-      throw new NotFoundException();
-    }
+    const subscription = await this.findByIdOrThrow(subscriptionId);
 
     subscription.stripeCustomerId = customerId;
     subscription.stripeSubscriptionId = stripeSubscriptionId;
@@ -228,28 +233,49 @@ export class SubscriptionsService {
     });
   }
 
-  async renewSubscription(subscriptionId: number, stripePeriodEnd?: Date) {
-    const subscription = await this.subscriptionRepo.findOne({
-      where: { id: subscriptionId },
-      relations: { restaurant: true },
-    });
+  async findByStripeSubscriptionIdOrThrow(
+    stripeSubscriptionId: string,
+  ): Promise<Subscription> {
+    const subscription =
+      await this.findByStripeSubscriptionId(stripeSubscriptionId);
 
     if (!subscription) {
-      throw new NotFoundException('Subscription not found');
+      throw new SubscriptionNotFoundException();
     }
+
+    return subscription;
+  }
+
+  async findById(subscriptionId: number): Promise<Subscription> {
+    return this.findByIdOrThrow(subscriptionId, { restaurant: true });
+  }
+
+  async startCheckout(subscriptionId: number): Promise<Subscription> {
+    const subscription = await this.findByIdOrThrow(subscriptionId, {
+      restaurant: { owner: true },
+    });
+
+    if (
+      subscription.status === SubscriptionStatus.CHECKOUT ||
+      subscription.status === SubscriptionStatus.ACTIVE
+    ) {
+      throw new BadRequestException(
+        'Subscription is already in checkout or active',
+      );
+    }
+
+    subscription.status = SubscriptionStatus.CHECKOUT;
+
+    return this.subscriptionRepo.save(subscription);
+  }
+
+  async renewSubscription(subscriptionId: number, stripePeriodEnd?: Date) {
+    const subscription = await this.findByIdOrThrow(subscriptionId, {
+      restaurant: true,
+    });
 
     const startDate = new Date();
-    let endDate = new Date(startDate);
-
-    switch (subscription.plan) {
-      case SubscriptionPlan.TEST:
-        endDate.setMinutes(endDate.getMinutes() + 2);
-        break;
-
-      case SubscriptionPlan.MONTHLY:
-        endDate.setMonth(endDate.getMonth() + 1);
-        break;
-    }
+    let endDate = this.computeEndDate(startDate, subscription.plan, 2);
 
     if (this.usesStripeSchedule(subscription) && stripePeriodEnd) {
       endDate = stripePeriodEnd;
@@ -261,7 +287,7 @@ export class SubscriptionsService {
 
     subscription.restaurant.isActive = true;
 
-    await this.restaurantRepository.save(subscription.restaurant);
+    await this.restaurantsService.setActive(subscription.restaurant.id, true);
 
     const savedSubScription = await this.subscriptionRepo.save(subscription);
     const delay = this.getExpirationDelay(savedSubScription);

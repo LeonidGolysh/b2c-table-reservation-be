@@ -3,13 +3,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { StripeService } from './stripe.service';
 import { StripeController } from './stripe.controller';
 import { SubscriptionsModule } from 'src/subscriptions/subscriptions.module';
-import { Subscription } from 'src/subscriptions/subscription.entity';
 import { StripeEvent } from './stripe-event.entity';
 import { PaymentModule } from 'src/payments/payments.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([StripeEvent, Subscription]),
+    TypeOrmModule.forFeature([StripeEvent]),
     SubscriptionsModule,
     PaymentModule,
   ],
