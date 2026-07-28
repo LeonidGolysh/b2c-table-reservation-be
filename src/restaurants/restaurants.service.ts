@@ -2,18 +2,17 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Restaurant } from './entity/restaurant.entity';
 import { Repository } from 'typeorm';
 import { RestaurantAddresses } from './entity/restaurant-addresses.entity';
-import { User } from 'src/users/user.entity';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
 import { UserRole } from 'src/users/user-role.enum';
-import { RestaurantNorFoundException } from './exceptions/restaurant-not-found.exception';
+import { RestaurantNotFoundException } from './exceptions/restaurant-not-found.exception';
 import { ResponseRestaurantDto } from './dto/response-restaurant.dto';
 import { SubscriptionsService } from 'src/subscriptions/subscriptions.service';
+import { SubscriptionNotFoundException } from 'src/subscriptions/exceptions/subscription-not-found.exception';
 import { DataSource } from 'typeorm';
 import { StripeService } from 'src/stripe/stripe.service';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { SubscriptionStatus } from 'src/subscriptions/enum/subscription-status.enum';
-import { Subscription } from 'src/subscriptions/subscription.entity';
+import { BadRequestException, forwardRef, Inject } from '@nestjs/common';
+import { UsersService } from 'src/users/users.service';
 
 export class RestaurantsService {
   constructor(
@@ -23,13 +22,11 @@ export class RestaurantsService {
     @InjectRepository(RestaurantAddresses)
     private addressesRepository: Repository<RestaurantAddresses>,
 
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
+    private readonly usersService: UsersService,
 
-    @InjectRepository(Subscription)
-    private subscriptionRepo: Repository<Subscription>,
-
+    @Inject(forwardRef(() => SubscriptionsService))
     private readonly subscriptionService: SubscriptionsService,
+
     private readonly dataSource: DataSource,
     private readonly stripeService: StripeService,
   ) {}
@@ -62,18 +59,10 @@ export class RestaurantsService {
   }
 
   async create(dto: CreateRestaurantDto) {
-    const owner = await this.userRepository.findOne({
-      where: {
-        id: dto.owner_id,
-      },
-    });
-
-    if (!owner) {
-      throw new Error('Owner not found');
-    }
+    const owner = await this.usersService.findOneEntity(dto.owner_id);
 
     if (owner.role !== UserRole.OWNER) {
-      throw new Error('Invalid owner');
+      throw new BadRequestException('User is not registered as an owner');
     }
 
     const savedId = await this.dataSource.transaction(async (manager) => {
@@ -130,10 +119,35 @@ export class RestaurantsService {
     });
 
     if (!restaurant) {
-      throw new RestaurantNorFoundException(id);
+      throw new RestaurantNotFoundException(id);
     }
 
     return this.mapToResponse(restaurant);
+  }
+
+  async findOneEntity(id: number): Promise<Restaurant> {
+    const restaurant = await this.restaurantRepository.findOne({
+      where: { id },
+    });
+
+    if (!restaurant) {
+      throw new RestaurantNotFoundException(id);
+    }
+
+    return restaurant;
+  }
+
+  async setActive(id: number, isActive: boolean): Promise<void> {
+    await this.restaurantRepository.update(id, { isActive });
+  }
+
+  async recordRating(id: number, rate: number): Promise<void> {
+    const restaurant = await this.findOneEntity(id);
+    const ratingCount = restaurant.ratingCount + 1;
+    const avgRating =
+      (restaurant.avgRating * restaurant.ratingCount + rate) / ratingCount;
+
+    await this.restaurantRepository.update(id, { ratingCount, avgRating });
   }
 
   async update(id: number, dto: UpdateRestaurantDto) {
@@ -145,7 +159,11 @@ export class RestaurantsService {
   }
 
   async remove(id: number) {
-    await this.restaurantRepository.delete(id);
+    const result = await this.restaurantRepository.delete(id);
+
+    if (!result.affected) {
+      throw new RestaurantNotFoundException(id);
+    }
 
     return {
       message: 'Restaurant deleted successfully',
@@ -155,36 +173,20 @@ export class RestaurantsService {
   async checkout(restaurantId: number) {
     const restaurant = await this.restaurantRepository.findOne({
       where: { id: restaurantId },
-      relations: {
-        subscriptions: {
-          restaurant: {
-            owner: true,
-          },
-        },
-      },
+      relations: { subscriptions: true },
     });
 
-    const subscription = restaurant?.subscriptions;
-
     if (!restaurant) {
-      throw new NotFoundException('Restaurant not found');
+      throw new RestaurantNotFoundException(restaurantId);
     }
 
-    if (!subscription) {
-      throw new NotFoundException('Subscription not found');
+    if (!restaurant.subscriptions) {
+      throw new SubscriptionNotFoundException();
     }
 
-    if (
-      subscription.status === SubscriptionStatus.CHECKOUT ||
-      subscription.status === SubscriptionStatus.ACTIVE
-    ) {
-      throw new BadRequestException(
-        'Subscription is already in checkout or active',
-      );
-    }
-
-    subscription.status = SubscriptionStatus.CHECKOUT;
-    await this.subscriptionRepo.save(subscription);
+    const subscription = await this.subscriptionService.startCheckout(
+      restaurant.subscriptions.id,
+    );
 
     const session =
       await this.stripeService.createCheckoutSession(subscription);

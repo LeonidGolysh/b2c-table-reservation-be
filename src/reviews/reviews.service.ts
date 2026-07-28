@@ -7,12 +7,12 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Review } from './review.entity';
 import { Repository } from 'typeorm';
-import { Restaurant } from 'src/restaurants/entity/restaurant.entity';
-import { User } from 'src/users/user.entity';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UserRole } from 'src/users/user-role.enum';
 import { ResponseReviewsDto } from './dto/response-review.dto';
 import { GetReviewsQueryDto } from './dto/get-reviews-query.dto';
+import { RestaurantsService } from 'src/restaurants/restaurants.service';
+import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class ReviewsService {
@@ -20,11 +20,8 @@ export class ReviewsService {
     @InjectRepository(Review)
     private reviewRepository: Repository<Review>,
 
-    @InjectRepository(Restaurant)
-    private restaurantRepository: Repository<Restaurant>,
-
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
+    private readonly restaurantsService: RestaurantsService,
+    private readonly usersService: UsersService,
   ) {}
 
   private mapToResponse(review: Review): ResponseReviewsDto {
@@ -43,21 +40,9 @@ export class ReviewsService {
   }
 
   async create(userId: number, restaurantId: number, dto: CreateReviewDto) {
-    const restaurant = await this.restaurantRepository.findOne({
-      where: { id: restaurantId },
-    });
-
-    if (!restaurant) {
-      throw new NotFoundException('Restaurant nor found');
-    }
-
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+    const restaurant =
+      await this.restaurantsService.findOneEntity(restaurantId);
+    const user = await this.usersService.findOneEntity(userId);
 
     if (user.role !== UserRole.USER) {
       throw new ForbiddenException('Only users can leave reviews');
@@ -83,15 +68,7 @@ export class ReviewsService {
 
     const savedReview = await this.reviewRepository.save(review);
 
-    const oldCount = restaurant.ratingCount;
-    const oldAvg = restaurant.avgRating;
-
-    const newCount = oldCount + 1;
-
-    restaurant.ratingCount = newCount;
-    restaurant.avgRating = (oldAvg * oldCount + dto.rate) / newCount;
-
-    await this.restaurantRepository.save(restaurant);
+    await this.restaurantsService.recordRating(restaurantId, dto.rate);
 
     const reviewWithRelations = await this.reviewRepository.findOne({
       where: {

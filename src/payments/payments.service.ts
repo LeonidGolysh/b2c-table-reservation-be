@@ -1,19 +1,18 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import Stripe from 'node_modules/stripe/esm/stripe.esm.node';
-import { Subscription } from 'src/subscriptions/subscription.entity';
-import { Not, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Payment } from './payment.entity';
 import { PaymentStatus } from './payment-status.enum';
+import { SubscriptionsService } from 'src/subscriptions/subscriptions.service';
 
 @Injectable()
 export class PaymentService {
   constructor(
-    @InjectRepository(Subscription)
-    private subscriptionRepo: Repository<Subscription>,
-
     @InjectRepository(Payment)
     private paymentRepository: Repository<Payment>,
+
+    private readonly subscriptionsService: SubscriptionsService,
   ) {}
 
   async createFromCheckout(session: Stripe.Checkout.Session) {
@@ -26,14 +25,8 @@ export class PaymentService {
     }
 
     const subscriptionId = Number(session.metadata?.subscriptionId);
-    const subscription = await this.subscriptionRepo.findOne({
-      where: { id: subscriptionId },
-      relations: { restaurant: true },
-    });
-
-    if (!subscription) {
-      throw new NotFoundException('Subscription not found');
-    }
+    const subscription =
+      await this.subscriptionsService.findById(subscriptionId);
 
     const payment = this.paymentRepository.create({
       subscription,
@@ -75,14 +68,10 @@ export class PaymentService {
       throw new NotFoundException('No Stripe subscription id');
     }
 
-    const subscription = await this.subscriptionRepo.findOne({
-      where: { stripeSubscriptionId },
-      relations: { restaurant: true },
-    });
-
-    if (!subscription) {
-      throw new NotFoundException('Subscription not found');
-    }
+    const subscription =
+      await this.subscriptionsService.findByStripeSubscriptionIdOrThrow(
+        stripeSubscriptionId,
+      );
 
     const payment = this.paymentRepository.create({
       subscription,

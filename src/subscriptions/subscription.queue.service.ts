@@ -10,11 +10,26 @@ export class SubscriptionQueueService {
     private readonly queue: Queue,
   ) {}
 
-  async scheduleExpiration(subscriptionId: number, delayMs: number) {
-    const jobId = `subscription-${subscriptionId}-expire`;
+  private jobId(subscriptionId: number, jobName: 'expire' | 'renew'): string {
+    return `subscription-${subscriptionId}-${jobName}`;
+  }
 
+  private async removeExistingJob(jobId: string): Promise<void> {
+    const existingJob = await this.queue.getJob(jobId);
+
+    if (existingJob) {
+      await existingJob.remove();
+    }
+  }
+
+  private async schedule(
+    jobName: 'expire-subscription' | 'renew-subscription',
+    jobId: string,
+    subscriptionId: number,
+    delayMs: number,
+  ): Promise<void> {
     await this.queue.add(
-      'expire-subscription',
+      jobName,
       { subscriptionId },
       {
         jobId,
@@ -23,54 +38,29 @@ export class SubscriptionQueueService {
         removeOnFail: true,
       },
     );
+  }
+
+  async scheduleExpiration(subscriptionId: number, delayMs: number) {
+    const jobId = this.jobId(subscriptionId, 'expire');
+
+    await this.schedule('expire-subscription', jobId, subscriptionId, delayMs);
   }
 
   async rescheduleExpiration(subscriptionId: number, delayMs: number) {
-    const jobId = `subscription-${subscriptionId}-expire`;
-    const existingJob = await this.queue.getJob(jobId);
+    const jobId = this.jobId(subscriptionId, 'expire');
 
-    if (existingJob) {
-      await existingJob.remove();
-    }
-
-    await this.queue.add(
-      'expire-subscription',
-      { subscriptionId },
-      {
-        jobId,
-        delay: delayMs,
-        removeOnComplete: true,
-        removeOnFail: true,
-      },
-    );
+    await this.removeExistingJob(jobId);
+    await this.schedule('expire-subscription', jobId, subscriptionId, delayMs);
   }
 
   async rescheduleRenewal(subscriptionId: number, delayMs: number) {
-    const jobId = `subscription-${subscriptionId}-renew`;
-    const existingJob = await this.queue.getJob(jobId);
+    const jobId = this.jobId(subscriptionId, 'renew');
 
-    if (existingJob) {
-      await existingJob.remove();
-    }
-
-    await this.queue.add(
-      'renew-subscription',
-      { subscriptionId },
-      {
-        jobId,
-        delay: delayMs,
-        removeOnComplete: true,
-        removeOnFail: true,
-      },
-    );
+    await this.removeExistingJob(jobId);
+    await this.schedule('renew-subscription', jobId, subscriptionId, delayMs);
   }
 
   async cancelRenewal(subscriptionId: number) {
-    const jobId = `subscription-${subscriptionId}-renew`;
-    const existingJob = await this.queue.getJob(jobId);
-
-    if (existingJob) {
-      await existingJob.remove();
-    }
+    await this.removeExistingJob(this.jobId(subscriptionId, 'renew'));
   }
 }

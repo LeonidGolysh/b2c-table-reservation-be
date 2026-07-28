@@ -6,7 +6,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
 import { ResponseUserDto } from './dto/response-user.dto';
-import { UserNotFountException } from './exceptions/user-not-found.exception';
+import { UserNotFoundException } from './exceptions/user-not-found.exception';
 import { UserRole } from './user-role.enum';
 
 @Injectable()
@@ -67,7 +67,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new UserNotFountException(id);
+      throw new UserNotFoundException(id);
     }
 
     return this.mapToResponse(user);
@@ -79,7 +79,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new UserNotFountException(id);
+      throw new UserNotFoundException(id);
     }
 
     return user;
@@ -93,17 +93,17 @@ export class UsersService {
     });
 
     if (!updateUser) {
-      throw new UserNotFountException(id);
+      throw new UserNotFoundException(id);
     }
 
     return this.mapToResponse(updateUser);
   }
 
   async remove(id: number) {
-    const user = await this.userRepository.delete(id);
+    const result = await this.userRepository.delete(id);
 
-    if (!user) {
-      throw new UserNotFountException(id);
+    if (!result.affected) {
+      throw new UserNotFoundException(id);
     }
 
     return {
