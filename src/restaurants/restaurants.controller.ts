@@ -7,9 +7,11 @@ import {
   ParseIntPipe,
   Post,
   Put,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiBearerAuth,
   ApiBody,
   ApiConflictResponse,
   ApiNotFoundResponse,
@@ -23,6 +25,7 @@ import { ValidationErrorResponse } from 'src/common/dto/validation-error-respons
 import { ErrorResponseDto } from 'src/common/dto/error-response.dto';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
 @ApiTags('Restaurants')
 @Controller('restaurants')
@@ -43,6 +46,8 @@ export class RestaurantsController {
     description: 'Restaurant already exists',
     type: ErrorResponseDto,
   })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Post()
   create(@Body() dto: CreateRestaurantDto): Promise<ResponseRestaurantDto> {
     return this.restaurantsService.create(dto);
