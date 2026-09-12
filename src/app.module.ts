@@ -9,6 +9,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { StripeModule } from './stripe/stripe.module';
 import { PaymentModule } from './payments/payments.module';
 import { RedisModule } from './redis/redis.module';
+import { BillingsModule } from './billings/billings.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { RedisModule } from './redis/redis.module';
     SubscriptionsModule,
     StripeModule,
     PaymentModule,
+    BillingsModule,
   ],
 })
 export class AppModule {}
