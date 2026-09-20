@@ -15,6 +15,16 @@ export class PaymentService {
     private readonly subscriptionsService: SubscriptionsService,
   ) {}
 
+  async findByIdWithRelations(paymentId: number): Promise<Payment | null> {
+    return this.paymentRepository.findOne({
+      where: { id: paymentId },
+      relations: {
+        restaurant: { owner: true },
+        subscription: true,
+      },
+    });
+  }
+
   async createFromCheckout(session: Stripe.Checkout.Session) {
     const existing = await this.paymentRepository.findOne({
       where: { stripeSessionId: session.id },
