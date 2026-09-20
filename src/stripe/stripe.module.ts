@@ -5,10 +5,12 @@ import { StripeController } from './stripe.controller';
 import { SubscriptionsModule } from 'src/subscriptions/subscriptions.module';
 import { StripeEvent } from './stripe-event.entity';
 import { PaymentModule } from 'src/payments/payments.module';
+import { MailModule } from 'src/mail/mail.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([StripeEvent]),
+    MailModule,
     SubscriptionsModule,
     PaymentModule,
   ],

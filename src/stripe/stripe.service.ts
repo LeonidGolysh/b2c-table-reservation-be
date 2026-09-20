@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import Stripe from 'node_modules/stripe/esm/stripe.esm.node';
 import { SubscriptionPlan } from 'src/subscriptions/enum/subscription-plan.enum';
@@ -7,10 +7,12 @@ import { SubscriptionsService } from 'src/subscriptions/subscriptions.service';
 import { Repository } from 'typeorm';
 import { StripeEvent } from './stripe-event.entity';
 import { PaymentService } from 'src/payments/payments.service';
+import { MailQueueService } from 'src/mail/mail.queue.service';
 
 @Injectable()
 export class StripeService {
   private readonly stripe: Stripe;
+  private readonly logger = new Logger(StripeService.name);
 
   constructor(
     @InjectRepository(StripeEvent)
@@ -18,6 +20,7 @@ export class StripeService {
 
     private readonly subscriptionService: SubscriptionsService,
     private readonly paymentService: PaymentService,
+    private readonly mailQueueService: MailQueueService,
   ) {
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
       apiVersion: '2026-05-27.dahlia',
@@ -180,11 +183,20 @@ export class StripeService {
     const stripePeriodEnd =
       await this.getSubscriptionPeriodEnd(stripeSubscriptionId);
 
-    await this.paymentService.createFromCheckout(session);
+    const payment = await this.paymentService.createFromCheckout(session);
     await this.subscriptionService.activeSubscription(
       Number(subscriptionId),
       stripePeriodEnd,
     );
+
+    try {
+      await this.mailQueueService.enqueueSubscriptionPaymentEmail(payment.id);
+    } catch (error) {
+      this.logger.error(
+        `Failed to enqueue payment email for payment ${payment.id}`,
+        error,
+      );
+    }
   }
 
   async testConnection() {
