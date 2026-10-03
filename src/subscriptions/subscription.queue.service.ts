@@ -10,7 +10,10 @@ export class SubscriptionQueueService {
     private readonly queue: Queue,
   ) {}
 
-  private jobId(subscriptionId: number, jobName: 'expire' | 'renew'): string {
+  private jobId(
+    subscriptionId: number,
+    jobName: 'expire' | 'renew' | 'payment-reminder',
+  ): string {
     return `subscription-${subscriptionId}-${jobName}`;
   }
 
@@ -23,7 +26,7 @@ export class SubscriptionQueueService {
   }
 
   private async schedule(
-    jobName: 'expire-subscription' | 'renew-subscription',
+    jobName: 'expire-subscription' | 'renew-subscription' | 'payment-reminder',
     jobId: string,
     subscriptionId: number,
     delayMs: number,
@@ -62,5 +65,21 @@ export class SubscriptionQueueService {
 
   async cancelRenewal(subscriptionId: number) {
     await this.removeExistingJob(this.jobId(subscriptionId, 'renew'));
+  }
+
+  async schedulePaymentReminder(
+    subscriptionId: number,
+    delayMs: number,
+  ): Promise<void> {
+    const jobId = this.jobId(subscriptionId, 'payment-reminder');
+
+    await this.removeExistingJob(jobId);
+    await this.schedule('payment-reminder', jobId, subscriptionId, delayMs);
+  }
+
+  async cancelPaymentReminder(subscriptionId: number): Promise<void> {
+    await this.removeExistingJob(
+      this.jobId(subscriptionId, 'payment-reminder'),
+    );
   }
 }
