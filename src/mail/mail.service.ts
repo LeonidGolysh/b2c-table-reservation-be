@@ -2,6 +2,8 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import nodemailer, { Transporter } from 'nodemailer';
 import { SubscriptionPaymentEmail } from './interface/subscription-payment-email.interface';
 import { subscriptionPaymentTemplate } from './templates/subscription-payment.template';
+import { SubscriptionPaymentReminderEmail } from './interface/subscription-payment-reminder-email.interface';
+import { subscriptionPaymentReminderTemplate } from './templates/susbcription-payment-reminder.template';
 
 @Injectable()
 export class MailService implements OnModuleInit {
@@ -50,5 +52,23 @@ export class MailService implements OnModuleInit {
     });
 
     this.logger.log(`Payment email sent to ${email}`);
+  }
+
+  async sendSubscriptionPaymentReminderEmail(
+    params: SubscriptionPaymentReminderEmail,
+  ): Promise<void> {
+    const { email, ...content } = params;
+    const { subject, text, html } =
+      subscriptionPaymentReminderTemplate(content);
+
+    await this.transporter.sendMail({
+      from: this.from,
+      to: email,
+      subject,
+      text,
+      html,
+    });
+
+    this.logger.log(`Reminder payment email send tp ${email}`);
   }
 }

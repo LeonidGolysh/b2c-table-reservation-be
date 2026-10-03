@@ -10,16 +10,21 @@ export class SubscriptionProcessor extends WorkerHost {
   }
 
   async process(job: Job<any>) {
-    if (job.name === 'expire-subscription') {
-      const { subscriptionId } = job.data;
+    const { subscriptionId } = job.data;
 
+    if (job.name === 'expire-subscription') {
       await this.subscriptionService.expireSubscription(subscriptionId);
+      return;
     }
 
     if (job.name === 'renew-subscription') {
-      const { subscriptionId } = job.data;
-
       await this.subscriptionService.renewSubscription(subscriptionId);
+      return;
+    }
+
+    if (job.name === 'payment-reminder') {
+      await this.subscriptionService.sendPaymentReminder(subscriptionId);
+      return;
     }
   }
 }

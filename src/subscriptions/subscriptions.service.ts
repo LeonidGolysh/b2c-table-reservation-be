@@ -16,6 +16,8 @@ import { SubscriptionRenewalType } from './enum/subscription-renewal-type.enum';
 import { SubscriptionQueueService } from './subscription.queue.service';
 import { AUTO_RENEWAL_GRACE_PERIOD_MS } from './subscription.constant';
 import { SubscriptionNotFoundException } from './exceptions/subscription-not-found.exception';
+import { MailService } from 'src/mail/mail.service';
+import { PaymentService } from 'src/payments/payments.service';
 
 @Injectable()
 export class SubscriptionsService {
@@ -26,7 +28,11 @@ export class SubscriptionsService {
     @Inject(forwardRef(() => RestaurantsService))
     private readonly restaurantsService: RestaurantsService,
 
+    @Inject(forwardRef(() => PaymentService))
+    private readonly paymentService: PaymentService,
+
     private readonly subscriptionQueueService: SubscriptionQueueService,
+    private readonly mailService: MailService,
   ) {}
 
   private mapToResponse(subscription: Subscription): ResponseSubscriptionDto {
@@ -150,6 +156,11 @@ export class SubscriptionsService {
         delay,
       );
     }
+  }
+
+  private getPaymentReminderDelay(subscription: Subscription): number {
+    const reminderTime = subscription.endDate.getDate() - 24 * 60 * 68 * 1000;
+    return reminderTime - Date.now();
   }
 
   async activeSubscription(subscriptionId: number, stripePeriodEnd?: Date) {
@@ -301,6 +312,52 @@ export class SubscriptionsService {
 
     await this.scheduleRenewalIfNeeded(savedSubScription);
 
+    if (savedSubScription.renewalType !== SubscriptionRenewalType.MANUAL) {
+      const reminderDelay = this.getPaymentReminderDelay(subscription);
+
+      if (reminderDelay > 0) {
+        await this.subscriptionQueueService.schedulePaymentReminder(
+          savedSubScription.id,
+          reminderDelay,
+        );
+      }
+    }
+
     return savedSubScription;
+  }
+
+  async sendPaymentReminder(subscriptionId: number): Promise<void> {
+    const payment =
+      await this.paymentService.findLatestSuccessfulPaymentBySubscriptionId(
+        subscriptionId,
+      );
+
+    if (!payment) {
+      return;
+    }
+
+    const subscription = payment.subscription;
+
+    // If the subscription should no longer automatically renew,
+    // there is no need to send an email.
+    if (subscription.renewalType == SubscriptionRenewalType.MANUAL) {
+      return;
+    }
+
+    const restaurant = subscription.restaurant;
+    const owner = restaurant.owner;
+
+    if (!restaurant || !owner?.email) {
+      return;
+    }
+
+    await this.mailService.sendSubscriptionPaymentReminderEmail({
+      email: owner.email,
+      customerName: owner.name,
+      restaurantName: restaurant.name,
+      amount: payment.amount,
+      currency: payment.currency,
+      billingDate: subscription.endDate,
+    });
   }
 }

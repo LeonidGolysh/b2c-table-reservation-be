@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import Stripe from 'node_modules/stripe/esm/stripe.esm.node';
 import { Repository } from 'typeorm';
@@ -12,8 +12,31 @@ export class PaymentService {
     @InjectRepository(Payment)
     private paymentRepository: Repository<Payment>,
 
+    @Inject(forwardRef(() => SubscriptionsService))
     private readonly subscriptionsService: SubscriptionsService,
   ) {}
+
+  async findLatestSuccessfulPaymentBySubscriptionId(
+    subscriptionId: number,
+  ): Promise<Payment | null> {
+    return this.paymentRepository.findOne({
+      where: {
+        subscription: {
+          id: subscriptionId,
+        },
+        status: PaymentStatus.SUCCEEDED,
+      },
+      relations: {
+        subscription: true,
+        restaurant: {
+          owner: true,
+        },
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
 
   async findByIdWithRelations(paymentId: number): Promise<Payment | null> {
     return this.paymentRepository.findOne({
