@@ -14,7 +14,10 @@ import { ResponseSubscriptionDto } from './dto/response-subscription.dto';
 import { SubscriptionPlan } from './enum/subscription-plan.enum';
 import { SubscriptionRenewalType } from './enum/subscription-renewal-type.enum';
 import { SubscriptionQueueService } from './subscription.queue.service';
-import { AUTO_RENEWAL_GRACE_PERIOD_MS } from './subscription.constant';
+import {
+  AUTO_RENEWAL_GRACE_PERIOD_MS,
+  PAYMENT_REMINDER_BEFORE_END_MS,
+} from './subscription.constant';
 import { SubscriptionNotFoundException } from './exceptions/subscription-not-found.exception';
 import { MailService } from 'src/mail/mail.service';
 import { PaymentService } from 'src/payments/payments.service';
@@ -159,8 +162,50 @@ export class SubscriptionsService {
   }
 
   private getPaymentReminderDelay(subscription: Subscription): number {
-    const reminderTime = subscription.endDate.getDate() - 24 * 60 * 68 * 1000;
+    const reminderTime =
+      subscription.endDate.getTime() - PAYMENT_REMINDER_BEFORE_END_MS;
     return reminderTime - Date.now();
+  }
+
+  private async schedulePaymentReminderIfNeeded(subscription: Subscription) {
+    if (subscription.renewalType !== SubscriptionRenewalType.AUTO) {
+      return;
+    }
+
+    const delay = this.getPaymentReminderDelay(subscription);
+
+    if (delay > 0) {
+      await this.subscriptionQueueService.schedulePaymentReminder(
+        subscription.id,
+        delay,
+      );
+    }
+  }
+
+  // Persists an active subscription, marks its restaurant active and
+  // (re)schedules every time-based job tied to the new period.
+  private async saveActiveSubscription(
+    subscription: Subscription,
+  ): Promise<Subscription> {
+    subscription.status = SubscriptionStatus.ACTIVE;
+    subscription.restaurant.isActive = true;
+
+    await this.restaurantsService.setActive(subscription.restaurant.id, true);
+
+    const savedSubscription = await this.subscriptionRepo.save(subscription);
+    const delay = this.getExpirationDelay(savedSubscription);
+
+    if (delay > 0) {
+      await this.subscriptionQueueService.rescheduleExpiration(
+        savedSubscription.id,
+        delay,
+      );
+    }
+
+    await this.scheduleRenewalIfNeeded(savedSubscription);
+    await this.schedulePaymentReminderIfNeeded(savedSubscription);
+
+    return savedSubscription;
   }
 
   async activeSubscription(subscriptionId: number, stripePeriodEnd?: Date) {
@@ -168,28 +213,11 @@ export class SubscriptionsService {
       restaurant: true,
     });
 
-    subscription.status = SubscriptionStatus.ACTIVE;
-    subscription.restaurant.isActive = true;
-
     if (this.usesStripeSchedule(subscription) && stripePeriodEnd) {
       subscription.endDate = stripePeriodEnd;
     }
 
-    await this.restaurantsService.setActive(subscription.restaurant.id, true);
-
-    const savedSubScription = await this.subscriptionRepo.save(subscription);
-    const delay = this.getExpirationDelay(savedSubScription);
-
-    if (delay > 0) {
-      await this.subscriptionQueueService.rescheduleExpiration(
-        savedSubScription.id,
-        delay,
-      );
-    }
-
-    await this.scheduleRenewalIfNeeded(savedSubScription);
-
-    return savedSubScription;
+    return this.saveActiveSubscription(subscription);
   }
 
   async expireSubscription(subscriptionId: number) {
@@ -198,6 +226,7 @@ export class SubscriptionsService {
     });
 
     await this.subscriptionQueueService.cancelRenewal(subscription.id);
+    await this.subscriptionQueueService.cancelPaymentReminder(subscription.id);
 
     if (subscription.status !== SubscriptionStatus.ACTIVE) {
       return subscription;
@@ -292,38 +321,10 @@ export class SubscriptionsService {
       endDate = stripePeriodEnd;
     }
 
-    subscription.status = SubscriptionStatus.ACTIVE;
     subscription.startDate = startDate;
     subscription.endDate = endDate;
 
-    subscription.restaurant.isActive = true;
-
-    await this.restaurantsService.setActive(subscription.restaurant.id, true);
-
-    const savedSubScription = await this.subscriptionRepo.save(subscription);
-    const delay = this.getExpirationDelay(savedSubScription);
-
-    if (delay > 0) {
-      await this.subscriptionQueueService.rescheduleExpiration(
-        savedSubScription.id,
-        delay,
-      );
-    }
-
-    await this.scheduleRenewalIfNeeded(savedSubScription);
-
-    if (savedSubScription.renewalType !== SubscriptionRenewalType.MANUAL) {
-      const reminderDelay = this.getPaymentReminderDelay(subscription);
-
-      if (reminderDelay > 0) {
-        await this.subscriptionQueueService.schedulePaymentReminder(
-          savedSubScription.id,
-          reminderDelay,
-        );
-      }
-    }
-
-    return savedSubScription;
+    return this.saveActiveSubscription(subscription);
   }
 
   async sendPaymentReminder(subscriptionId: number): Promise<void> {
@@ -340,12 +341,14 @@ export class SubscriptionsService {
 
     // If the subscription should no longer automatically renew,
     // there is no need to send an email.
-    if (subscription.renewalType == SubscriptionRenewalType.MANUAL) {
+    if (subscription.renewalType === SubscriptionRenewalType.MANUAL) {
       return;
     }
 
-    const restaurant = subscription.restaurant;
-    const owner = restaurant.owner;
+    // The payment query loads restaurant.owner on the payment itself,
+    // not on payment.subscription.
+    const restaurant = payment.restaurant;
+    const owner = restaurant?.owner;
 
     if (!restaurant || !owner?.email) {
       return;

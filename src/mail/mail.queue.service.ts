@@ -1,7 +1,7 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import { Queue } from 'bullmq';
-import { MAIL_QUEUE } from './mail.constant';
+import { MAIL_JOBS, MAIL_QUEUE } from './mail.constant';
 
 @Injectable()
 export class MailQueueService {
@@ -12,7 +12,7 @@ export class MailQueueService {
 
   async enqueueSubscriptionPaymentEmail(paymentId: number): Promise<void> {
     await this.queue.add(
-      'subscription-payment-email',
+      MAIL_JOBS.SUBSCRIPTION_PAYMENT,
       { paymentId },
       {
         jobId: `payment-${paymentId}-email`,

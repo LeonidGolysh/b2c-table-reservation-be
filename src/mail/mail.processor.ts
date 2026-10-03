@@ -2,7 +2,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { PaymentService } from 'src/payments/payments.service';
-import { MAIL_QUEUE } from './mail.constant';
+import { MAIL_JOBS, MAIL_QUEUE } from './mail.constant';
 import { MailService } from './mail.service';
 
 interface SubscriptionPaymentEmailJob {
@@ -21,7 +21,7 @@ export class MailProcessor extends WorkerHost {
   }
 
   async process(job: Job<SubscriptionPaymentEmailJob>) {
-    if (job.name !== 'subscription-payment-email') {
+    if (job.name !== MAIL_JOBS.SUBSCRIPTION_PAYMENT) {
       return;
     }
 

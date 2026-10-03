@@ -58,22 +58,14 @@ export class UsersService {
   async findAll(): Promise<ResponseUserDto[]> {
     const users = await this.userRepository.find();
 
-    return users.map((users) => this.mapToResponse(users));
+    return users.map((user) => this.mapToResponse(user));
   }
 
   async findOne(id: number): Promise<ResponseUserDto> {
-    const user = await this.userRepository.findOne({
-      where: { id },
-    });
-
-    if (!user) {
-      throw new UserNotFoundException(id);
-    }
-
-    return this.mapToResponse(user);
+    return this.mapToResponse(await this.findOneEntity(id));
   }
 
-  async findOneEntity(id: number) {
+  async findOneEntity(id: number): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id },
     });
@@ -88,15 +80,7 @@ export class UsersService {
   async update(id: number, dto: UpdateUserDto): Promise<ResponseUserDto> {
     await this.userRepository.update(id, dto);
 
-    const updateUser = await this.userRepository.findOne({
-      where: { id },
-    });
-
-    if (!updateUser) {
-      throw new UserNotFoundException(id);
-    }
-
-    return this.mapToResponse(updateUser);
+    return this.findOne(id);
   }
 
   async remove(id: number) {

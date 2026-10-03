@@ -7,6 +7,7 @@ import { User } from 'src/users/user.entity';
 import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtService } from './strategies/jwt/jwt.service';
+import { JWT_SECRET } from './auth.constant';
 import type ms from 'ms';
 
 @Module({
@@ -15,7 +16,7 @@ import type ms from 'ms';
     TypeOrmModule.forFeature([User]),
     PassportModule,
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'secretKey',
+      secret: JWT_SECRET,
       signOptions: {
         expiresIn: (process.env.JWT_EXPIRES_IN ?? '1d') as ms.StringValue,
       },

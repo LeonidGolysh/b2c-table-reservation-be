@@ -1,5 +1,9 @@
 export const MAIL_QUEUE = 'mail';
 
+export const MAIL_JOBS = {
+  SUBSCRIPTION_PAYMENT: 'subscription-payment-email',
+} as const;
+
 // Locale used to format amounts and dates in outgoing emails.
 export const EMAIL_LOCALE = 'en-US';
 

@@ -5,9 +5,10 @@ import { Payment } from './payment.entity';
 import { SubscriptionsModule } from 'src/subscriptions/subscriptions.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Payment]),
-  forwardRef(() => SubscriptionsModule)
-],
+  imports: [
+    TypeOrmModule.forFeature([Payment]),
+    forwardRef(() => SubscriptionsModule),
+  ],
   providers: [PaymentService],
   exports: [PaymentService],
 })

@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { StripeEvent } from './stripe-event.entity';
 import { PaymentService } from 'src/payments/payments.service';
 import { MailQueueService } from 'src/mail/mail.queue.service';
+import { InvoiceWithSubscription } from 'src/subscriptions/interface/invoice-subscription.interface';
 
 @Injectable()
 export class StripeService {
@@ -107,7 +108,7 @@ export class StripeService {
         break;
 
       default:
-        console.log(event.type);
+        this.logger.debug(`Unhandled Stripe event: ${event.type}`);
     }
 
     return {
@@ -203,26 +204,38 @@ export class StripeService {
     return this.client.balance.retrieve();
   }
 
-  private async handleInvoicePaid(event: Stripe.Event) {
-    const invoice = event.data.object as any;
-    const stripeSubscriptionId = invoice.parent?.subscription_details
-      ?.subscription as string;
+  // Returns the local subscription a renewal invoice belongs to. Invoices for
+  // the initial payment are skipped: checkout.session.completed handles those.
+  private async findSubscriptionForRenewalInvoice(
+    invoice: InvoiceWithSubscription,
+  ): Promise<Subscription | null> {
+    const stripeSubscriptionId =
+      invoice.parent?.subscription_details?.subscription;
 
-    if (invoice.billing_reason === 'subscription_create') {
-      return;
+    if (
+      !stripeSubscriptionId ||
+      invoice.billing_reason === 'subscription_create'
+    ) {
+      return null;
     }
 
-    const subscription =
-      await this.subscriptionService.findByStripeSubscriptionId(
-        stripeSubscriptionId,
-      );
+    return this.subscriptionService.findByStripeSubscriptionId(
+      stripeSubscriptionId,
+    );
+  }
+
+  private async handleInvoicePaid(event: Stripe.Event) {
+    const invoice = event.data.object as Stripe.Invoice &
+      InvoiceWithSubscription;
+    const subscription = await this.findSubscriptionForRenewalInvoice(invoice);
 
     if (!subscription) {
       return;
     }
 
-    const stripePeriodEnd =
-      await this.getSubscriptionPeriodEnd(stripeSubscriptionId);
+    const stripePeriodEnd = await this.getSubscriptionPeriodEnd(
+      subscription.stripeSubscriptionId,
+    );
 
     await this.paymentService.createFromInvoice(invoice);
     await this.subscriptionService.renewSubscription(
@@ -232,18 +245,8 @@ export class StripeService {
   }
 
   private async handleInvoicePaymentFailed(event: Stripe.Event) {
-    const invoice = event.data.object as any;
-    const stripeSubscriptionId = invoice.parent?.subscription_details
-      ?.subscription as string;
-
-    if (invoice.billing_reason === 'subscription_create') {
-      return;
-    }
-
-    const subscription =
-      await this.subscriptionService.findByStripeSubscriptionId(
-        stripeSubscriptionId,
-      );
+    const invoice = event.data.object as InvoiceWithSubscription;
+    const subscription = await this.findSubscriptionForRenewalInvoice(invoice);
 
     if (!subscription) {
       return;

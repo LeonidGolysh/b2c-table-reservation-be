@@ -16,6 +16,7 @@ import { ErrorResponseDto } from 'src/common/dto/error-response.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ResponseCurrentUserDto } from './dto/response-current-user.dto';
 import { CurrentUser } from './decorator/current-user.decorator';
+import type { AuthUser } from './strategies/jwt/user.request.interface';
 
 @Controller('auth')
 export class AuthController {
@@ -67,7 +68,7 @@ export class AuthController {
     type: ErrorResponseDto,
   })
   @Get('me')
-  me(@CurrentUser() user: any): Promise<ResponseCurrentUserDto> {
+  me(@CurrentUser() user: AuthUser): Promise<ResponseCurrentUserDto> {
     return this.authService.me(user.userId);
   }
 }

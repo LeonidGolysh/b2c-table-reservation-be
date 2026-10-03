@@ -21,6 +21,7 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { PaginatedReviewsResponseDto } from './dto/paginated-reviews-response.dto';
 import { GetReviewsQueryDto } from './dto/get-reviews-query.dto';
 import { ErrorResponseDto } from 'src/common/dto/error-response.dto';
+import type { AuthUser } from 'src/auth/strategies/jwt/user.request.interface';
 
 @Controller('restaurants/:restaurantId/reviews')
 export class ReviewsController {
@@ -35,7 +36,7 @@ export class ReviewsController {
   create(
     @Param('restaurantId') restaurantId: number,
     @Body() dto: CreateReviewDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthUser,
   ) {
     return this.reviewService.create(user.userId, Number(restaurantId), dto);
   }

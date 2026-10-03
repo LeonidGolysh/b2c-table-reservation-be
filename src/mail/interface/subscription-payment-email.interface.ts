@@ -1,9 +1,6 @@
-export interface SubscriptionPaymentEmail {
-  email: string;
-  customerName: string;
-  restaurantName: string;
-  amount: number;
-  currency: string;
+import { SubscriptionEmail } from './subscription-email.interface';
+
+export interface SubscriptionPaymentEmail extends SubscriptionEmail {
   subscriptionEndDate: Date;
   stripePaymentId?: string | null;
 }
