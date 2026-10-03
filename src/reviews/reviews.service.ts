@@ -6,13 +6,23 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Review } from './review.entity';
-import { Repository } from 'typeorm';
+import { FindOptionsOrder, Repository } from 'typeorm';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UserRole } from 'src/users/user-role.enum';
 import { ResponseReviewsDto } from './dto/response-review.dto';
 import { GetReviewsQueryDto } from './dto/get-reviews-query.dto';
 import { RestaurantsService } from 'src/restaurants/restaurants.service';
 import { UsersService } from 'src/users/users.service';
+
+const REVIEW_SORT_ORDER: Record<
+  NonNullable<GetReviewsQueryDto['sort']>,
+  FindOptionsOrder<Review>
+> = {
+  latest: { createdAt: 'DESC' },
+  oldest: { createdAt: 'ASC' },
+  rating_asc: { rate: 'ASC' },
+  rating_desc: { rate: 'DESC' },
+};
 
 @Injectable()
 export class ReviewsService {
@@ -89,31 +99,7 @@ export class ReviewsService {
   async findByRestaurant(restaurantId: number, query: GetReviewsQueryDto) {
     const { page = 1, limit = 10, sort = 'latest' } = query;
 
-    let order: any;
-
-    switch (sort) {
-      case 'oldest':
-        order = {
-          createdAt: 'ASC',
-        };
-        break;
-      case 'rating_asc':
-        order = {
-          rate: 'ASC',
-        };
-        break;
-
-      case 'rating_desc':
-        order = {
-          rate: 'DESC',
-        };
-        break;
-
-      default:
-        order = {
-          createdAt: 'DESC',
-        };
-    }
+    const order = REVIEW_SORT_ORDER[sort];
 
     const [reviews, total] = await this.reviewRepository.findAndCount({
       where: {

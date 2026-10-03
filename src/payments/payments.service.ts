@@ -1,10 +1,16 @@
-import { forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import Stripe from 'node_modules/stripe/esm/stripe.esm.node';
 import { Repository } from 'typeorm';
 import { Payment } from './payment.entity';
 import { PaymentStatus } from './payment-status.enum';
 import { SubscriptionsService } from 'src/subscriptions/subscriptions.service';
+import { InvoiceWithSubscription } from 'src/subscriptions/interface/invoice-subscription.interface';
 
 @Injectable()
 export class PaymentService {
@@ -35,6 +41,17 @@ export class PaymentService {
       order: {
         createdAt: 'DESC',
       },
+    });
+  }
+
+  async findByRestaurantId(restaurantId: number): Promise<Payment[]> {
+    return this.paymentRepository.find({
+      where: { restaurant: { id: restaurantId } },
+      relations: {
+        subscription: true,
+        restaurant: true,
+      },
+      order: { createdAt: 'DESC' },
     });
   }
 
@@ -77,15 +94,7 @@ export class PaymentService {
     return await this.paymentRepository.save(payment);
   }
 
-  async createFromInvoice(
-    invoice: Stripe.Invoice & {
-      parent?: {
-        subscription_details?: {
-          subscription?: string;
-        };
-      };
-    },
-  ) {
+  async createFromInvoice(invoice: Stripe.Invoice & InvoiceWithSubscription) {
     const existing = await this.paymentRepository.findOne({
       where: { stripeInvoiceId: invoice.id },
     });
@@ -95,7 +104,7 @@ export class PaymentService {
     }
 
     const stripeSubscriptionId =
-      invoice.parent?.subscription_details.subscription;
+      invoice.parent?.subscription_details?.subscription;
 
     if (!stripeSubscriptionId) {
       throw new NotFoundException('No Stripe subscription id');

@@ -1,6 +1,6 @@
 import { InjectRepository } from '@nestjs/typeorm';
 import { Restaurant } from './entity/restaurant.entity';
-import { Repository } from 'typeorm';
+import { FindOptionsRelations, Repository } from 'typeorm';
 import { RestaurantAddresses } from './entity/restaurant-addresses.entity';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
@@ -11,9 +11,22 @@ import { SubscriptionsService } from 'src/subscriptions/subscriptions.service';
 import { SubscriptionNotFoundException } from 'src/subscriptions/exceptions/subscription-not-found.exception';
 import { DataSource } from 'typeorm';
 import { StripeService } from 'src/stripe/stripe.service';
-import { BadRequestException, forwardRef, Inject } from '@nestjs/common';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import { UsersService } from 'src/users/users.service';
 
+// Relations needed to build a ResponseRestaurantDto.
+const RESPONSE_RELATIONS: FindOptionsRelations<Restaurant> = {
+  owner: true,
+  addresses: true,
+  subscriptions: true,
+};
+
+@Injectable()
 export class RestaurantsService {
   constructor(
     @InjectRepository(Restaurant)
@@ -58,6 +71,22 @@ export class RestaurantsService {
     };
   }
 
+  private async findByIdOrThrow(
+    id: number,
+    relations?: FindOptionsRelations<Restaurant>,
+  ): Promise<Restaurant> {
+    const restaurant = await this.restaurantRepository.findOne({
+      where: { id },
+      ...(relations && { relations }),
+    });
+
+    if (!restaurant) {
+      throw new RestaurantNotFoundException(id);
+    }
+
+    return restaurant;
+  }
+
   async create(dto: CreateRestaurantDto) {
     const owner = await this.usersService.findOneEntity(dto.owner_id);
 
@@ -98,36 +127,32 @@ export class RestaurantsService {
 
   async findAll(): Promise<ResponseRestaurantDto[]> {
     const restaurants = await this.restaurantRepository.find({
-      relations: {
-        owner: true,
-        addresses: true,
-        subscriptions: true,
-      },
+      relations: RESPONSE_RELATIONS,
     });
 
     return restaurants.map((restaurant) => this.mapToResponse(restaurant));
   }
 
   async findOne(id: number): Promise<ResponseRestaurantDto> {
-    const restaurant = await this.restaurantRepository.findOne({
-      where: { id },
-      relations: {
-        owner: true,
-        addresses: true,
-        subscriptions: true,
-      },
-    });
-
-    if (!restaurant) {
-      throw new RestaurantNotFoundException(id);
-    }
+    const restaurant = await this.findByIdOrThrow(id, RESPONSE_RELATIONS);
 
     return this.mapToResponse(restaurant);
   }
 
   async findOneEntity(id: number): Promise<Restaurant> {
+    return this.findByIdOrThrow(id);
+  }
+
+  // Finds a restaurant only if it belongs to the given owner, so one owner
+  // can't read another owner's data.
+  async findOwnedByIdOrThrow(
+    id: number,
+    ownerId: number,
+    relations?: FindOptionsRelations<Restaurant>,
+  ): Promise<Restaurant> {
     const restaurant = await this.restaurantRepository.findOne({
-      where: { id },
+      where: { id, owner: { id: ownerId } },
+      ...(relations && { relations }),
     });
 
     if (!restaurant) {
@@ -135,6 +160,17 @@ export class RestaurantsService {
     }
 
     return restaurant;
+  }
+
+  async findAllByOwner(
+    ownerId: number,
+    relations?: FindOptionsRelations<Restaurant>,
+  ): Promise<Restaurant[]> {
+    return this.restaurantRepository.find({
+      where: { owner: { id: ownerId } },
+      ...(relations && { relations }),
+      order: { createdAt: 'ASC' },
+    });
   }
 
   async setActive(id: number, isActive: boolean): Promise<void> {
@@ -151,7 +187,7 @@ export class RestaurantsService {
   }
 
   async update(id: number, dto: UpdateRestaurantDto) {
-    await this.findOne(id);
+    await this.findByIdOrThrow(id);
 
     await this.restaurantRepository.update(id, dto);
 
@@ -171,14 +207,9 @@ export class RestaurantsService {
   }
 
   async checkout(restaurantId: number) {
-    const restaurant = await this.restaurantRepository.findOne({
-      where: { id: restaurantId },
-      relations: { subscriptions: true },
+    const restaurant = await this.findByIdOrThrow(restaurantId, {
+      subscriptions: true,
     });
-
-    if (!restaurant) {
-      throw new RestaurantNotFoundException(restaurantId);
-    }
 
     if (!restaurant.subscriptions) {
       throw new SubscriptionNotFoundException();

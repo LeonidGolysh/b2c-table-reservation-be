@@ -1,9 +1,10 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import nodemailer, { Transporter } from 'nodemailer';
+import { RenderedEmail } from './interface/rendered-email.interface';
 import { SubscriptionPaymentEmail } from './interface/subscription-payment-email.interface';
-import { subscriptionPaymentTemplate } from './templates/subscription-payment.template';
 import { SubscriptionPaymentReminderEmail } from './interface/subscription-payment-reminder-email.interface';
-import { subscriptionPaymentReminderTemplate } from './templates/susbcription-payment-reminder.template';
+import { subscriptionPaymentTemplate } from './templates/subscription-payment.template';
+import { subscriptionPaymentReminderTemplate } from './templates/subscription-payment-reminder.template';
 
 @Injectable()
 export class MailService implements OnModuleInit {
@@ -37,38 +38,23 @@ export class MailService implements OnModuleInit {
     }
   }
 
-  async sendSubscriptionPaymentEmail(
-    params: SubscriptionPaymentEmail,
-  ): Promise<void> {
-    const { email, ...content } = params;
-    const { subject, text, html } = subscriptionPaymentTemplate(content);
+  private async send(to: string, email: RenderedEmail): Promise<void> {
+    await this.transporter.sendMail({ from: this.from, to, ...email });
 
-    await this.transporter.sendMail({
-      from: this.from,
-      to: email,
-      subject,
-      text,
-      html,
-    });
-
-    this.logger.log(`Payment email sent to ${email}`);
+    this.logger.log(`Email "${email.subject}" sent to ${to}`);
   }
 
-  async sendSubscriptionPaymentReminderEmail(
-    params: SubscriptionPaymentReminderEmail,
-  ): Promise<void> {
-    const { email, ...content } = params;
-    const { subject, text, html } =
-      subscriptionPaymentReminderTemplate(content);
+  async sendSubscriptionPaymentEmail({
+    email,
+    ...content
+  }: SubscriptionPaymentEmail): Promise<void> {
+    await this.send(email, subscriptionPaymentTemplate(content));
+  }
 
-    await this.transporter.sendMail({
-      from: this.from,
-      to: email,
-      subject,
-      text,
-      html,
-    });
-
-    this.logger.log(`Reminder payment email send tp ${email}`);
+  async sendSubscriptionPaymentReminderEmail({
+    email,
+    ...content
+  }: SubscriptionPaymentReminderEmail): Promise<void> {
+    await this.send(email, subscriptionPaymentReminderTemplate(content));
   }
 }

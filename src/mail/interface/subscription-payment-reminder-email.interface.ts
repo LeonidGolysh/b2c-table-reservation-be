@@ -1,8 +1,5 @@
-export interface SubscriptionPaymentReminderEmail {
-  email: string;
-  customerName: string;
-  restaurantName: string;
-  amount: number;
-  currency: string;
+import { SubscriptionEmail } from './subscription-email.interface';
+
+export interface SubscriptionPaymentReminderEmail extends SubscriptionEmail {
   billingDate: Date;
 }

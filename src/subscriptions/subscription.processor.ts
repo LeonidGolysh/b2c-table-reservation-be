@@ -1,7 +1,15 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { SUBSCRIPTION_QUEUE } from './subscription.constant';
-import { SubscriptionsService } from './subscriptions.service';
 import { Job } from 'bullmq';
+import {
+  SUBSCRIPTION_JOBS,
+  SUBSCRIPTION_QUEUE,
+  SubscriptionJobName,
+} from './subscription.constant';
+import { SubscriptionsService } from './subscriptions.service';
+
+interface SubscriptionJob {
+  subscriptionId: number;
+}
 
 @Processor(SUBSCRIPTION_QUEUE)
 export class SubscriptionProcessor extends WorkerHost {
@@ -9,22 +17,21 @@ export class SubscriptionProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<any>) {
+  async process(job: Job<SubscriptionJob, unknown, SubscriptionJobName>) {
     const { subscriptionId } = job.data;
 
-    if (job.name === 'expire-subscription') {
-      await this.subscriptionService.expireSubscription(subscriptionId);
-      return;
-    }
+    switch (job.name) {
+      case SUBSCRIPTION_JOBS.EXPIRE:
+        await this.subscriptionService.expireSubscription(subscriptionId);
+        break;
 
-    if (job.name === 'renew-subscription') {
-      await this.subscriptionService.renewSubscription(subscriptionId);
-      return;
-    }
+      case SUBSCRIPTION_JOBS.RENEW:
+        await this.subscriptionService.renewSubscription(subscriptionId);
+        break;
 
-    if (job.name === 'payment-reminder') {
-      await this.subscriptionService.sendPaymentReminder(subscriptionId);
-      return;
+      case SUBSCRIPTION_JOBS.PAYMENT_REMINDER:
+        await this.subscriptionService.sendPaymentReminder(subscriptionId);
+        break;
     }
   }
 }

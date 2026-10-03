@@ -1,7 +1,11 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import { Queue } from 'bullmq';
-import { SUBSCRIPTION_QUEUE } from './subscription.constant';
+import {
+  SUBSCRIPTION_JOBS,
+  SUBSCRIPTION_QUEUE,
+  SubscriptionJobName,
+} from './subscription.constant';
 
 @Injectable()
 export class SubscriptionQueueService {
@@ -26,7 +30,7 @@ export class SubscriptionQueueService {
   }
 
   private async schedule(
-    jobName: 'expire-subscription' | 'renew-subscription' | 'payment-reminder',
+    jobName: SubscriptionJobName,
     jobId: string,
     subscriptionId: number,
     delayMs: number,
@@ -46,21 +50,36 @@ export class SubscriptionQueueService {
   async scheduleExpiration(subscriptionId: number, delayMs: number) {
     const jobId = this.jobId(subscriptionId, 'expire');
 
-    await this.schedule('expire-subscription', jobId, subscriptionId, delayMs);
+    await this.schedule(
+      SUBSCRIPTION_JOBS.EXPIRE,
+      jobId,
+      subscriptionId,
+      delayMs,
+    );
   }
 
   async rescheduleExpiration(subscriptionId: number, delayMs: number) {
     const jobId = this.jobId(subscriptionId, 'expire');
 
     await this.removeExistingJob(jobId);
-    await this.schedule('expire-subscription', jobId, subscriptionId, delayMs);
+    await this.schedule(
+      SUBSCRIPTION_JOBS.EXPIRE,
+      jobId,
+      subscriptionId,
+      delayMs,
+    );
   }
 
   async rescheduleRenewal(subscriptionId: number, delayMs: number) {
     const jobId = this.jobId(subscriptionId, 'renew');
 
     await this.removeExistingJob(jobId);
-    await this.schedule('renew-subscription', jobId, subscriptionId, delayMs);
+    await this.schedule(
+      SUBSCRIPTION_JOBS.RENEW,
+      jobId,
+      subscriptionId,
+      delayMs,
+    );
   }
 
   async cancelRenewal(subscriptionId: number) {
@@ -74,7 +93,12 @@ export class SubscriptionQueueService {
     const jobId = this.jobId(subscriptionId, 'payment-reminder');
 
     await this.removeExistingJob(jobId);
-    await this.schedule('payment-reminder', jobId, subscriptionId, delayMs);
+    await this.schedule(
+      SUBSCRIPTION_JOBS.PAYMENT_REMINDER,
+      jobId,
+      subscriptionId,
+      delayMs,
+    );
   }
 
   async cancelPaymentReminder(subscriptionId: number): Promise<void> {
