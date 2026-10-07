@@ -5,14 +5,19 @@ import { MAIL_QUEUE } from './mail.constant';
 import { MailProcessor } from './mail.processor';
 import { MailQueueService } from './mail.queue.service';
 import { MailService } from './mail.service';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Email } from './entity/email.entity';
+import { MailController } from './mail.controller';
 
 @Module({
   imports: [
+    TypeOrmModule.forFeature([Email]),
     PaymentModule,
     BullModule.registerQueue({
       name: MAIL_QUEUE,
     }),
   ],
+  controllers: [MailController],
   providers: [MailService, MailQueueService, MailProcessor],
   exports: [MailQueueService, MailService],
 })
