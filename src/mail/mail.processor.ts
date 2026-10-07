@@ -46,6 +46,7 @@ export class MailProcessor extends WorkerHost {
       restaurantName: payment.restaurant.name,
       amount: payment.amount,
       currency: payment.currency,
+      billingDate: payment.createdAt,
       subscriptionEndDate: payment.subscription.endDate,
       stripePaymentId: payment.stripePaymentIntentId,
     });
