@@ -29,7 +29,7 @@ export class SubscriptionPaymentReminderEmailDto {
   @IsString()
   currency: string;
 
-  @ApiProperty({ example: '2026-10-08T12:00:00.000Z'})
+  @ApiProperty({ example: '2026-10-08T12:00:00.000Z' })
   @IsDateString()
   billingDate: string;
 }

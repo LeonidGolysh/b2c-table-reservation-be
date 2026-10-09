@@ -87,6 +87,20 @@ export class RestaurantsService {
     return restaurant;
   }
 
+  async findByIdAndOwner(
+    restaurantId: number,
+    ownerId: number,
+  ): Promise<Restaurant | null> {
+    return this.restaurantRepository.findOne({
+      where: {
+        id: restaurantId,
+        owner: {
+          id: ownerId,
+        },
+      },
+    });
+  }
+
   async create(dto: CreateRestaurantDto) {
     const owner = await this.usersService.findOneEntity(dto.owner_id);
 
