@@ -11,6 +11,7 @@ import { PaymentModule } from './payments/payments.module';
 import { RedisModule } from './redis/redis.module';
 import { BillingsModule } from './billings/billings.module';
 import { MailModule } from './mail/mail.module';
+import { RestaurantTablesModule } from './restaurants/tables/restaurant-tables.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { MailModule } from './mail/mail.module';
     PaymentModule,
     BillingsModule,
     MailModule,
+    RestaurantTablesModule,
   ],
 })
 export class AppModule {}

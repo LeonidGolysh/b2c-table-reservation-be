@@ -14,6 +14,7 @@ import { RestaurantAddresses } from './restaurant-addresses.entity';
 import { Review } from 'src/reviews/review.entity';
 import { Subscription } from 'src/subscriptions/subscription.entity';
 import { Payment } from 'src/payments/payment.entity';
+import { RestaurantTable } from '../tables/entity/restaurant-table.entity';
 
 @Entity('restaurants')
 export class Restaurant {
@@ -56,4 +57,7 @@ export class Restaurant {
 
   @OneToMany(() => Payment, (payment) => payment.restaurant)
   payments: Payment[];
+
+  @OneToMany(() => RestaurantTable, (table) => table.restaurant)
+  tables: RestaurantTable[];
 }
