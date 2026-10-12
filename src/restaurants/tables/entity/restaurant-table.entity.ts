@@ -1,5 +1,13 @@
 import { Restaurant } from 'src/restaurants/entity/restaurant.entity';
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { RestaurantTableStatus } from '../enum/restaurant-table-status.enum';
+import { ReservationTable } from 'src/restaurants/reservations/entity/reservation-table.entity';
 
 @Entity('restaurant_tables')
 export class RestaurantTable {
@@ -15,8 +23,21 @@ export class RestaurantTable {
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
+  @Column({
+    type: 'enum',
+    enum: RestaurantTableStatus,
+    default: RestaurantTableStatus.FREE,
+  })
+  status: RestaurantTableStatus;
+
   @ManyToOne(() => Restaurant, (restaurant) => restaurant.tables, {
     onDelete: 'CASCADE',
   })
   restaurant: Restaurant;
+
+  @OneToMany(
+    () => ReservationTable,
+    (reservationTable) => reservationTable.restaurantTable,
+  )
+  reservationTables: ReservationTable[];
 }
