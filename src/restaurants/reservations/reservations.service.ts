@@ -13,17 +13,56 @@ import { CreateReservationDto } from './dto/create-reservation.dto';
 import { ReservationTable } from './entity/reservation-table.entity';
 import { ReservationStatus } from './enum/reservation-status.enum';
 import { RestaurantTableStatus } from '../tables/enum/restaurant-table-status.enum';
-import { UpdateReservationDto } from './dto/update-reservatio.dto';
+import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { ResponseReservationDto } from './dto/response-reservation.dto';
 import { toResponseReservationDto } from './dto/mapper/response-reservation.mapper';
 import { MailService } from 'src/mail/mail.service';
 import { createHash, randomBytes } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 
+const DEFAULT_DURATION_MINUTES = 120;
+const DEFAULT_BUFFER_MINUTES = 60;
+
+// Upper bound on how many tables can be combined for one reservation.
+// Keeps the combination search from exploding in large restaurants.
+const MAX_TABLES_PER_RESERVATION = 8;
+
+// Reservations in these statuses hold their tables.
+const ACTIVE_STATUSES = [
+  ReservationStatus.PENDING,
+  ReservationStatus.CONFIRMED,
+];
+
+const ALLOWED_STATUS_TRANSITIONS: Record<
+  ReservationStatus,
+  ReservationStatus[]
+> = {
+  [ReservationStatus.PENDING]: [
+    ReservationStatus.CONFIRMED,
+    ReservationStatus.CANCELED,
+    ReservationStatus.NO_SHOW,
+  ],
+  [ReservationStatus.CONFIRMED]: [
+    ReservationStatus.CANCELED,
+    ReservationStatus.COMPLETED,
+    ReservationStatus.NO_SHOW,
+  ],
+  [ReservationStatus.CANCELED]: [],
+  [ReservationStatus.COMPLETED]: [],
+  [ReservationStatus.NO_SHOW]: [],
+};
+
+interface TableRequest {
+  restaurantId: number;
+  startTime: Date;
+  guestsCount: number;
+  durationMinutes: number;
+  bufferMinutes: number;
+  excludeReservationId?: number;
+}
+
 @Injectable()
 export class ReservationsService {
-  private readonly defaultDurationMinutes = 120;
-  private readonly defaultBufferMinutes = 60;
   private readonly logger = new Logger(ReservationsService.name);
 
   constructor(
@@ -33,12 +72,7 @@ export class ReservationsService {
   ) {}
 
   async getAll(restaurantId: number): Promise<ResponseReservationDto[]> {
-    const reservations = await this.dataSource
-      .getRepository(Reservation)
-      .createQueryBuilder('reservation')
-      .innerJoinAndSelect('reservation.restaurant', 'restaurant')
-      .leftJoinAndSelect('reservation.reservationTables', 'reservationTables')
-      .leftJoinAndSelect('reservationTables.restaurantTable', 'table')
+    const reservations = await this.reservationQuery(this.dataSource.manager)
       .where('restaurant.id = :restaurantId', { restaurantId })
       .orderBy('reservation.startTime', 'ASC')
       .getMany();
@@ -50,12 +84,7 @@ export class ReservationsService {
     restaurantId: number,
     reservationId: number,
   ): Promise<ResponseReservationDto> {
-    const reservation = await this.dataSource
-      .getRepository(Reservation)
-      .createQueryBuilder('reservation')
-      .innerJoin('reservation.restaurant', 'restaurant')
-      .leftJoinAndSelect('reservation.reservationTables', 'reservationTables')
-      .leftJoinAndSelect('reservationTables.restaurantTable', 'table')
+    const reservation = await this.reservationQuery(this.dataSource.manager)
       .where('restaurant.id = :restaurantId', { restaurantId })
       .andWhere('reservation.id = :reservationId', { reservationId })
       .getOne();
@@ -70,172 +99,86 @@ export class ReservationsService {
   async create(
     restaurantId: number,
     dto: CreateReservationDto,
-  ): Promise<Reservation> {
+  ): Promise<ResponseReservationDto> {
     const startTime = this.validateStartTime(dto.startTime);
-    const checkInToken = randomBytes(32).toString('hex');
-    const checkInTokenHash = createHash('sha256')
-      .update(checkInToken)
-      .digest('hex');
+    const { token: checkInToken, hash: checkInTokenHash } =
+      this.generateCheckInToken();
 
     const reservation = await this.dataSource.transaction(async (manager) => {
       const restaurant = await this.findRestaurant(manager, restaurantId);
 
-      const tables = await this.lockActiveTables(manager, restaurantId);
-
-      const durationMinutes = this.defaultDurationMinutes;
-      const bufferMinutes = this.defaultBufferMinutes;
-
-      const requestedEnd = this.calculateOccupiedUntil(
+      const tables = await this.allocateTables(manager, {
+        restaurantId,
         startTime,
-        durationMinutes,
-        bufferMinutes,
+        guestsCount: dto.guestsCount,
+        durationMinutes: DEFAULT_DURATION_MINUTES,
+        bufferMinutes: DEFAULT_BUFFER_MINUTES,
+      });
+
+      const reservationRepository = manager.getRepository(Reservation);
+      const reservation = await reservationRepository.save(
+        reservationRepository.create({
+          customerName: dto.customerName,
+          customerEmail: dto.customerEmail,
+          customerPhone: dto.customerPhone,
+          guestsCount: dto.guestsCount,
+          startTime,
+          durationMinutes: DEFAULT_DURATION_MINUTES,
+          bufferMinutes: DEFAULT_BUFFER_MINUTES,
+          status: ReservationStatus.CONFIRMED,
+          restaurant,
+          checkInTokenHash,
+        }),
       );
 
-      const busyTableIds = await this.findBusyTableIds(
-        manager,
-        tables,
-        startTime,
-        requestedEnd,
-      );
+      await this.assignTables(manager, reservation, tables);
 
-      // Initially, only tables currently marked FREE are candidates
-      // See the note below about future bookings and live table status.
-      const availableTables = tables.filter(
-        (table) =>
-          table.status === RestaurantTableStatus.FREE &&
-          !busyTableIds.has(table.id),
-      );
-
-      const selectedTables = this.selectTables(
-        availableTables,
-        dto.guestsCount,
-      );
-
-      if (!selectedTables) {
-        throw new ConflictException(
-          'No suitable combinations of tables is available for this time',
-        );
-      }
-
-      const reservation = await this.saveReservation(
-        manager,
-        restaurant,
-        dto,
-        startTime,
-        durationMinutes,
-        bufferMinutes,
-        checkInTokenHash,
-      );
-
-      await this.assignTables(manager, reservation, selectedTables);
-
-      return this.findCreatedReservation(manager, reservation.id);
+      return this.findReservationWithRelations(manager, reservation.id);
     });
-
-    const checkInUrl =
-      `${this.configService.getOrThrow<string>('FRONTEND_URL')}` +
-      `/staff/check-in?token=${checkInToken}`;
 
     // Send the email only after the transaction has committed,
     // so table locks are not held during the SMTP call.
-    try {
-      await this.mailService.sendReservationDetailsEmail(
-        {
-          email: reservation.customerEmail,
-          reservationId: reservation.id,
-          restaurantName: reservation.restaurant.name,
-          customerName: reservation.customerName,
-          customerPhone: reservation.customerPhone ?? undefined,
-          startTime: reservation.startTime.toISOString(),
-          guestsCount: reservation.guestsCount,
-        },
-        checkInUrl,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Failed to send reservation email for reservation ${reservation.id}`,
-        error instanceof Error ? error.stack : String(error),
-      );
-    }
+    await this.sendReservationEmail(reservation, checkInToken);
 
-    return reservation;
+    return toResponseReservationDto(reservation);
   }
 
   async update(
     restaurantId: number,
     reservationId: number,
     dto: UpdateReservationDto,
-  ): Promise<Reservation> {
+  ): Promise<ResponseReservationDto> {
     if (Object.keys(dto).length === 0) {
       throw new BadRequestException('At least one field must be provided');
     }
 
-    return this.dataSource.transaction(async (manager) => {
-      const reservationRepository = manager.getRepository(Reservation);
+    const reservation = await this.dataSource.transaction(async (manager) => {
+      const reservation = await this.lockReservation(
+        manager,
+        restaurantId,
+        reservationId,
+      );
 
-      const reservation = await reservationRepository
-        .createQueryBuilder('reservation')
-        .innerJoin('reservation.restaurant', 'restaurant')
-        .where('reservation.id = :reservationId', {
-          reservationId,
-        })
-        .andWhere('restaurant.id = :restaurantId', {
-          restaurantId,
-        })
-        .setLock('pessimistic_write')
-        .getOne();
-
-      if (!reservation) {
-        throw new NotFoundException('reservation not found');
-      }
-
-      if (
-        reservation.status === ReservationStatus.CANCELED ||
-        reservation.status === ReservationStatus.COMPLETED ||
-        reservation.status === ReservationStatus.NO_SHOW
-      ) {
+      if (this.isFinalStatus(reservation.status)) {
         throw new ConflictException(
-          'This reservation can no longer be updated.',
+          'This reservation can no longer be updated',
         );
       }
 
       const startTime = dto.startTime
         ? this.validateStartTime(dto.startTime)
         : reservation.startTime;
-
       const guestsCount = dto.guestsCount ?? reservation.guestsCount;
-      const needsTableReassignment =
-        dto.startTime !== undefined || dto.guestsCount !== undefined;
 
-      if (needsTableReassignment) {
-        const tables = await this.lockActiveTables(manager, restaurantId);
-        const requestedEnd = this.calculateOccupiedUntil(
+      if (dto.startTime !== undefined || dto.guestsCount !== undefined) {
+        const tables = await this.allocateTables(manager, {
+          restaurantId,
           startTime,
-          reservation.durationMinutes,
-          reservation.bufferMinutes,
-        );
-
-        const busyTableIds = await this.findBusyTableIds(
-          manager,
-          tables,
-          startTime,
-          requestedEnd,
-          reservationId,
-        );
-
-        const availableTables = tables.filter(
-          (table) =>
-            table.status === RestaurantTableStatus.FREE &&
-            !busyTableIds.has(table.id),
-        );
-
-        const selectedTables = this.selectTables(availableTables, guestsCount);
-
-        if (!selectedTables) {
-          throw new ConflictException(
-            'No suitable combination of tables is available for this time',
-          );
-        }
+          guestsCount,
+          durationMinutes: reservation.durationMinutes,
+          bufferMinutes: reservation.bufferMinutes,
+          excludeReservationId: reservationId,
+        });
 
         // Replace old table assignments only after finding a valid new combination.
         // The whole operation is transactional.
@@ -243,7 +186,7 @@ export class ReservationsService {
           .getRepository(ReservationTable)
           .delete({ reservation: { id: reservationId } });
 
-        await this.assignTables(manager, reservation, selectedTables);
+        await this.assignTables(manager, reservation, tables);
       }
 
       if (dto.customerName !== undefined) {
@@ -261,10 +204,12 @@ export class ReservationsService {
       reservation.guestsCount = guestsCount;
       reservation.startTime = startTime;
 
-      await reservationRepository.save(reservation);
+      await manager.getRepository(Reservation).save(reservation);
 
-      return this.findCreatedReservation(manager, reservation.id);
+      return this.findReservationWithRelations(manager, reservation.id);
     });
+
+    return toResponseReservationDto(reservation);
   }
 
   async updateStatus(
@@ -272,38 +217,14 @@ export class ReservationsService {
     reservationId: number,
     status: ReservationStatus,
   ): Promise<ResponseReservationDto> {
-    return this.dataSource.transaction(async (manager) => {
-      const reservation = await manager
-        .getRepository(Reservation)
-        .createQueryBuilder('reservation')
-        .innerJoinAndSelect('reservation.restaurant', 'restaurant')
-        .where('reservation.id = :reservationId', { reservationId })
-        .andWhere('restaurant.id = :restaurantId', { restaurantId })
-        .setLock('pessimistic_write')
-        .getOne();
+    const reservation = await this.dataSource.transaction(async (manager) => {
+      const reservation = await this.lockReservation(
+        manager,
+        restaurantId,
+        reservationId,
+      );
 
-      if (!reservation) {
-        throw new NotFoundException('Reservation not found');
-      }
-
-      const allowedTransitions: Record<ReservationStatus, ReservationStatus[]> =
-        {
-          [ReservationStatus.PENDING]: [
-            ReservationStatus.CONFIRMED,
-            ReservationStatus.CANCELED,
-            ReservationStatus.NO_SHOW,
-          ],
-          [ReservationStatus.CONFIRMED]: [
-            ReservationStatus.CANCELED,
-            ReservationStatus.COMPLETED,
-            ReservationStatus.NO_SHOW,
-          ],
-          [ReservationStatus.CANCELED]: [],
-          [ReservationStatus.COMPLETED]: [],
-          [ReservationStatus.NO_SHOW]: [],
-        };
-
-      if (!allowedTransitions[reservation.status].includes(status)) {
+      if (!ALLOWED_STATUS_TRANSITIONS[reservation.status].includes(status)) {
         throw new ConflictException(
           `Cannot change reservation status from "${reservation.status}" to "${status}"`,
         );
@@ -312,17 +233,89 @@ export class ReservationsService {
       reservation.status = status;
       await manager.getRepository(Reservation).save(reservation);
 
-      const updatedReservation = await manager
-        .getRepository(Reservation)
-        .createQueryBuilder('reservation')
-        .innerJoinAndSelect('reservation.restaurant', 'restaurant')
-        .leftJoinAndSelect('reservation.reservationTables', 'reservationTables')
-        .leftJoinAndSelect('reservationTables.restaurantTable', 'table')
-        .where('reservation.id = :reservationId', { reservationId })
-        .getOneOrFail();
-
-      return toResponseReservationDto(updatedReservation);
+      return this.findReservationWithRelations(manager, reservation.id);
     });
+
+    return toResponseReservationDto(reservation);
+  }
+
+  private reservationQuery(manager: EntityManager) {
+    return manager
+      .getRepository(Reservation)
+      .createQueryBuilder('reservation')
+      .innerJoinAndSelect('reservation.restaurant', 'restaurant')
+      .leftJoinAndSelect('reservation.reservationTables', 'reservationTables')
+      .leftJoinAndSelect('reservationTables.restaurantTable', 'table');
+  }
+
+  private async findReservationWithRelations(
+    manager: EntityManager,
+    reservationId: number,
+  ): Promise<Reservation> {
+    return this.reservationQuery(manager)
+      .where('reservation.id = :reservationId', { reservationId })
+      .getOneOrFail();
+  }
+
+  private async lockReservation(
+    manager: EntityManager,
+    restaurantId: number,
+    reservationId: number,
+  ): Promise<Reservation> {
+    const reservation = await manager
+      .getRepository(Reservation)
+      .createQueryBuilder('reservation')
+      .innerJoin('reservation.restaurant', 'restaurant')
+      .where('reservation.id = :reservationId', { reservationId })
+      .andWhere('restaurant.id = :restaurantId', { restaurantId })
+      .setLock('pessimistic_write')
+      .getOne();
+
+    if (!reservation) {
+      throw new NotFoundException('Reservation not found');
+    }
+
+    return reservation;
+  }
+
+  private isFinalStatus(status: ReservationStatus): boolean {
+    return ALLOWED_STATUS_TRANSITIONS[status].length === 0;
+  }
+
+  private generateCheckInToken(): { token: string; hash: string } {
+    const token = randomBytes(32).toString('hex');
+    const hash = createHash('sha256').update(token).digest('hex');
+
+    return { token, hash };
+  }
+
+  private async sendReservationEmail(
+    reservation: Reservation,
+    checkInToken: string,
+  ): Promise<void> {
+    const checkInUrl =
+      `${this.configService.getOrThrow<string>('FRONTEND_URL')}` +
+      `/staff/check-in?token=${checkInToken}`;
+
+    // The reservation is already committed, so an email failure
+    // must not fail the request.
+    try {
+      await this.mailService.sendReservationDetailsEmail({
+        email: reservation.customerEmail,
+        reservationId: reservation.id,
+        restaurantName: reservation.restaurant.name,
+        customerName: reservation.customerName,
+        customerPhone: reservation.customerPhone ?? undefined,
+        startTime: reservation.startTime,
+        guestsCount: reservation.guestsCount,
+        checkInUrl,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send reservation email for reservation ${reservation.id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
   }
 
   private validateStartTime(value: string): Date {
@@ -356,6 +349,49 @@ export class ReservationsService {
     return restaurant;
   }
 
+  // Locks the restaurant's tables and picks a free combination that fits
+  // the guests for the requested time slot. Throws if none fits.
+  private async allocateTables(
+    manager: EntityManager,
+    request: TableRequest,
+  ): Promise<RestaurantTable[]> {
+    const tables = await this.lockActiveTables(manager, request.restaurantId);
+
+    const occupiedUntil = this.calculateOccupiedUntil(
+      request.startTime,
+      request.durationMinutes,
+      request.bufferMinutes,
+    );
+
+    const busyTableIds = await this.findBusyTableIds(
+      manager,
+      tables,
+      request.startTime,
+      occupiedUntil,
+      request.excludeReservationId,
+    );
+
+    // Initially, only tables currently marked FREE are candidates.
+    const availableTables = tables.filter(
+      (table) =>
+        table.status === RestaurantTableStatus.FREE &&
+        !busyTableIds.has(table.id),
+    );
+
+    const selectedTables = this.selectTables(
+      availableTables,
+      request.guestsCount,
+    );
+
+    if (!selectedTables) {
+      throw new ConflictException(
+        'No suitable combination of tables is available for this time',
+      );
+    }
+
+    return selectedTables;
+  }
+
   private async lockActiveTables(
     manager: EntityManager,
     restaurantId: number,
@@ -374,7 +410,7 @@ export class ReservationsService {
 
     if (tables.length === 0) {
       throw new ConflictException(
-        'No active table are available in this restaurant',
+        'No active tables are available in this restaurant',
       );
     }
 
@@ -409,7 +445,7 @@ export class ReservationsService {
       .select('table.id', 'tableId')
       .where('table.id IN (:...tableIds)', { tableIds })
       .andWhere('reservation.status IN (:...statuses)', {
-        statuses: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED],
+        statuses: ACTIVE_STATUSES,
       })
       .andWhere('reservation.startTime < :requestedEnd', {
         requestedEnd,
@@ -435,15 +471,13 @@ export class ReservationsService {
     tables: RestaurantTable[],
     guestsCount: number,
   ): RestaurantTable[] | null {
-    // Prefer fewer tables and as little unused capacity as possible.
+    // Prefer as little unused capacity as possible, then fewer tables.
     const sorted = [...tables].sort((a, b) => a.seat - b.seat || a.id - b.id);
 
     let best: RestaurantTable[] | null = null;
     let bestSeats = Number.POSITIVE_INFINITY;
 
-    // Search combinations, limiting search depth to avoid explosive
-    // combinations in restaurants with many tables.
-    const maxTables = Math.min(sorted.length, 8);
+    const maxTables = Math.min(sorted.length, MAX_TABLES_PER_RESERVATION);
 
     const search = (
       start: number,
@@ -475,33 +509,6 @@ export class ReservationsService {
     return best;
   }
 
-  private async saveReservation(
-    manager: EntityManager,
-    restaurant: Restaurant,
-    dto: CreateReservationDto,
-    startTime: Date,
-    durationMinutes: number,
-    bufferMinutes: number,
-    checkInTokenHash: string,
-  ): Promise<Reservation> {
-    const repository = manager.getRepository(Reservation);
-
-    const reservation = repository.create({
-      customerName: dto.customerName,
-      customerEmail: dto.customerEmail,
-      customerPhone: dto.customerPhone,
-      guestsCount: dto.guestsCount,
-      startTime,
-      durationMinutes,
-      bufferMinutes,
-      status: ReservationStatus.CONFIRMED,
-      restaurant,
-      checkInTokenHash,
-    });
-
-    return repository.save(reservation);
-  }
-
   private async assignTables(
     manager: EntityManager,
     reservation: Reservation,
@@ -517,28 +524,5 @@ export class ReservationsService {
     );
 
     await repository.save(assignments);
-  }
-
-  private async findCreatedReservation(
-    manager: EntityManager,
-    reservationId: number,
-  ): Promise<Reservation> {
-    const reservation = await manager.getRepository(Reservation).findOne({
-      where: {
-        id: reservationId,
-      },
-      relations: {
-        restaurant: true,
-        reservationTables: {
-          restaurantTable: true,
-        },
-      },
-    });
-
-    if (!reservation) {
-      throw new NotFoundException('Created reservation not found');
-    }
-
-    return reservation;
   }
 }

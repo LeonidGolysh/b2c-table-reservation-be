@@ -64,7 +64,12 @@ export class MailController {
       `${this.configService.getOrThrow<string>('FRONTEND_URL')}` +
       `/staff/check-in?token=test-token`;
 
-    await this.mailService.sendReservationDetailsEmail(dto, checkInUrl);
+    await this.mailService.sendReservationDetailsEmail({
+      ...dto,
+      startTime: new Date(dto.startTime),
+      checkInUrl,
+    });
+
     return {
       message: 'Table reservation email sent',
     };
