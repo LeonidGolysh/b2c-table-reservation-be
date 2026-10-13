@@ -13,6 +13,8 @@ export interface EmailContent {
   intro: string;
   details: EmailDetail[];
   outro?: string;
+  qrCodeCid?: string;
+  fallbackUrl?: string;
 }
 
 // Shared layout for all outgoing emails: greeting, intro, a list of details,
@@ -31,6 +33,9 @@ export function renderEmail(content: EmailContent): RenderedEmail {
     '',
     ...details.map(({ label, value }) => `${label}: ${value}`),
     ...(outro ? ['', outro] : []),
+    ...(content.fallbackUrl
+      ? ['', 'Check-in link: ', content.fallbackUrl]
+      : []),
     '',
     signOff,
   ].join('\n');
@@ -55,6 +60,22 @@ export function renderEmail(content: EmailContent): RenderedEmail {
         </ul>
 
         ${outro ? `<p>${escapeHtml(outro)}</p>\n\n        ` : ''}<p>${signOff}</p>
+
+        ${
+          content.qrCodeCid
+            ? `
+          <div style="text-align:center;margin-top:24px">
+            <p>Show this QR code to the restaurant staff.</p>
+            <img
+              src="cid:${escapeHtml(content.qrCodeCid)}"
+              alt="Reservation QR code"
+              width="240"
+              height="240"
+            />
+          </div>
+        `
+            : ''
+        }
       </div>
     `.trim();
 

@@ -3,7 +3,9 @@ import { ReservationEmail } from '../interface/reservation-email.interface';
 import { renderEmail } from './base-email.template';
 import { formatDate } from './email-format.util';
 
-export type ReservationEmailParams = Omit<ReservationEmail, 'email'>;
+export type ReservationEmailParams = Omit<ReservationEmail, 'email'> & {
+  checkInUrl?: string;
+};
 
 export function reservationEmailTemplate(
   params: ReservationEmailParams,
@@ -15,8 +17,9 @@ export function reservationEmailTemplate(
     customerPhone,
     startTime,
     guestsCount,
+    checkInUrl,
   } = params;
-  return renderEmail({
+  const email = renderEmail({
     subject: 'Table reservation',
     heading: 'Table reservation',
     customerName,
@@ -41,5 +44,9 @@ export function reservationEmailTemplate(
       ...(customerPhone ? [{ label: 'Phone', value: customerPhone }] : []),
     ],
     outro: 'We look forward to welcoming you!',
+    ...(checkInUrl ? { qrCodeCid: 'reservation-qr' } : {}),
+    fallbackUrl: checkInUrl,
   });
+
+  return email;
 }

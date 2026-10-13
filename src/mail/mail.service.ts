@@ -17,6 +17,7 @@ import { Repository } from 'typeorm';
 import { EmailStatus } from './enum/email-status.enum';
 import { reservationEmailTemplate } from './templates/reservation-email.template';
 import { ReservationEmailDto } from './dto/reservation-email.dto';
+import * as QRCode from 'qrcode';
 
 @Injectable()
 export class MailService implements OnModuleInit {
@@ -135,15 +136,40 @@ export class MailService implements OnModuleInit {
     );
   }
 
-  async sendReservationDetailsEmail(dto: ReservationEmailDto): Promise<void> {
+  async sendReservationDetailsEmail(
+    dto: ReservationEmailDto,
+    checkInUrl: string,
+  ): Promise<void> {
     const { email, startTime, ...content } = dto;
+
+    const qrBuffer = await QRCode.toBuffer(checkInUrl, {
+      type: 'png',
+      width: 240,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+    });
+
+    const renderedEmail = reservationEmailTemplate({
+      ...content,
+      startTime: new Date(startTime),
+      checkInUrl,
+    });
 
     await this.send(
       email,
-      reservationEmailTemplate({
-        ...content,
-        startTime: new Date(startTime),
-      }),
+      {
+        ...renderedEmail,
+        text: `${renderedEmail.text}\n\nCheck-in link: ${checkInUrl}`,
+        attachments: [
+          ...(renderedEmail.attachments ?? []),
+          {
+            filename: 'reservation-qr.png',
+            content: qrBuffer,
+            contentType: 'image/png',
+            cid: 'reservation-qr',
+          },
+        ],
+      },
       EmailType.RESERVATION,
     );
   }
