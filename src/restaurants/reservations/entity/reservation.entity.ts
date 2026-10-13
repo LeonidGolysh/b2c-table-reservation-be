@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
@@ -66,4 +67,13 @@ export class Reservation {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @Index({ unique: true })
+  @Column({
+    name: 'check_in_token_hash',
+    type: 'varchar',
+    length: 64,
+    nullable: true,
+  })
+  checkInTokenHash: string | null;
 }

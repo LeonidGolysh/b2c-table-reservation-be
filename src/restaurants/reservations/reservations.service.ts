@@ -17,6 +17,8 @@ import { UpdateReservationDto } from './dto/update-reservatio.dto';
 import { ResponseReservationDto } from './dto/response-reservation.dto';
 import { toResponseReservationDto } from './dto/mapper/response-reservation.mapper';
 import { MailService } from 'src/mail/mail.service';
+import { createHash, randomBytes } from 'node:crypto';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class ReservationsService {
@@ -27,6 +29,7 @@ export class ReservationsService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly mailService: MailService,
+    private readonly configService: ConfigService,
   ) {}
 
   async getAll(restaurantId: number): Promise<ResponseReservationDto[]> {
@@ -69,6 +72,10 @@ export class ReservationsService {
     dto: CreateReservationDto,
   ): Promise<Reservation> {
     const startTime = this.validateStartTime(dto.startTime);
+    const checkInToken = randomBytes(32).toString('hex');
+    const checkInTokenHash = createHash('sha256')
+      .update(checkInToken)
+      .digest('hex');
 
     const reservation = await this.dataSource.transaction(async (manager) => {
       const restaurant = await this.findRestaurant(manager, restaurantId);
@@ -117,6 +124,7 @@ export class ReservationsService {
         startTime,
         durationMinutes,
         bufferMinutes,
+        checkInTokenHash,
       );
 
       await this.assignTables(manager, reservation, selectedTables);
@@ -124,18 +132,25 @@ export class ReservationsService {
       return this.findCreatedReservation(manager, reservation.id);
     });
 
+    const checkInUrl =
+      `${this.configService.getOrThrow<string>('FRONTEND_URL')}` +
+      `/staff/check-in?token=${checkInToken}`;
+
     // Send the email only after the transaction has committed,
     // so table locks are not held during the SMTP call.
     try {
-      await this.mailService.sendReservationDetailsEmail({
-        email: reservation.customerEmail,
-        reservationId: reservation.id,
-        restaurantName: reservation.restaurant.name,
-        customerName: reservation.customerName,
-        customerPhone: reservation.customerPhone ?? undefined,
-        startTime: reservation.startTime.toISOString(),
-        guestsCount: reservation.guestsCount,
-      });
+      await this.mailService.sendReservationDetailsEmail(
+        {
+          email: reservation.customerEmail,
+          reservationId: reservation.id,
+          restaurantName: reservation.restaurant.name,
+          customerName: reservation.customerName,
+          customerPhone: reservation.customerPhone ?? undefined,
+          startTime: reservation.startTime.toISOString(),
+          guestsCount: reservation.guestsCount,
+        },
+        checkInUrl,
+      );
     } catch (error) {
       this.logger.error(
         `Failed to send reservation email for reservation ${reservation.id}`,
@@ -467,6 +482,7 @@ export class ReservationsService {
     startTime: Date,
     durationMinutes: number,
     bufferMinutes: number,
+    checkInTokenHash: string,
   ): Promise<Reservation> {
     const repository = manager.getRepository(Reservation);
 
@@ -480,6 +496,7 @@ export class ReservationsService {
       bufferMinutes,
       status: ReservationStatus.CONFIRMED,
       restaurant,
+      checkInTokenHash,
     });
 
     return repository.save(reservation);
