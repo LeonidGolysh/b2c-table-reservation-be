@@ -10,6 +10,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { MailService } from './mail.service';
 import { SubscriptionPaymentEmailDto } from './dto/subscription-payment-email.dto';
 import { SubscriptionPaymentReminderEmailDto } from './dto/subscripiton-payment-reminder-email.dto';
+import { ReservationEmailDto } from './dto/reservation-email.dto';
 
 @ApiTags('Email notifications')
 @Controller('emails')
@@ -50,6 +51,14 @@ export class MailController {
 
     return {
       message: 'Subscription payment reminder sent',
+    };
+  }
+
+  @Post('table-reservation')
+  async sendReservationTableEmail(@Body() dto: ReservationEmailDto) {
+    await this.mailService.sendReservationDetailsEmail(dto);
+    return {
+      message: 'Table reservation email sent',
     };
   }
 }

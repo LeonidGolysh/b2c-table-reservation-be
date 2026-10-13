@@ -6,6 +6,7 @@ import { RestaurantTable } from '../tables/entity/restaurant-table.entity';
 import { ReservationTable } from './entity/reservation-table.entity';
 import { ReservationsService } from './reservations.service';
 import { ReservationsController } from './reservations.controller';
+import { MailModule } from 'src/mail/mail.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { ReservationsController } from './reservations.controller';
       Reservation,
       ReservationTable,
     ]),
+    MailModule,
   ],
   controllers: [ReservationsController],
   providers: [ReservationsService],

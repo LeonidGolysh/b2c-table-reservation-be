@@ -15,6 +15,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Email } from './entity/email.entity';
 import { Repository } from 'typeorm';
 import { EmailStatus } from './enum/email-status.enum';
+import { reservationEmailTemplate } from './templates/reservation-email.template';
+import { ReservationEmailDto } from './dto/reservation-email.dto';
 
 @Injectable()
 export class MailService implements OnModuleInit {
@@ -130,6 +132,19 @@ export class MailService implements OnModuleInit {
       email,
       subscriptionPaymentReminderTemplate(content),
       EmailType.PAYMENT_REMINDER,
+    );
+  }
+
+  async sendReservationDetailsEmail(dto: ReservationEmailDto): Promise<void> {
+    const { email, startTime, ...content } = dto;
+
+    await this.send(
+      email,
+      reservationEmailTemplate({
+        ...content,
+        startTime: new Date(startTime),
+      }),
+      EmailType.RESERVATION,
     );
   }
 }
