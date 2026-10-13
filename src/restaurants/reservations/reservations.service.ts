@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Reservation } from './entity/reservation.entity';
@@ -15,13 +16,18 @@ import { RestaurantTableStatus } from '../tables/enum/restaurant-table-status.en
 import { UpdateReservationDto } from './dto/update-reservatio.dto';
 import { ResponseReservationDto } from './dto/response-reservation.dto';
 import { toResponseReservationDto } from './dto/mapper/response-reservation.mapper';
+import { MailService } from 'src/mail/mail.service';
 
 @Injectable()
 export class ReservationsService {
   private readonly defaultDurationMinutes = 120;
   private readonly defaultBufferMinutes = 60;
+  private readonly logger = new Logger(ReservationsService.name);
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly mailService: MailService,
+  ) {}
 
   async getAll(restaurantId: number): Promise<ResponseReservationDto[]> {
     const reservations = await this.dataSource
@@ -64,7 +70,7 @@ export class ReservationsService {
   ): Promise<Reservation> {
     const startTime = this.validateStartTime(dto.startTime);
 
-    return this.dataSource.transaction(async (manager) => {
+    const reservation = await this.dataSource.transaction(async (manager) => {
       const restaurant = await this.findRestaurant(manager, restaurantId);
 
       const tables = await this.lockActiveTables(manager, restaurantId);
@@ -117,6 +123,27 @@ export class ReservationsService {
 
       return this.findCreatedReservation(manager, reservation.id);
     });
+
+    // Send the email only after the transaction has committed,
+    // so table locks are not held during the SMTP call.
+    try {
+      await this.mailService.sendReservationDetailsEmail({
+        email: reservation.customerEmail,
+        reservationId: reservation.id,
+        restaurantName: reservation.restaurant.name,
+        customerName: reservation.customerName,
+        customerPhone: reservation.customerPhone ?? undefined,
+        startTime: reservation.startTime.toISOString(),
+        guestsCount: reservation.guestsCount,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send reservation email for reservation ${reservation.id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+
+    return reservation;
   }
 
   async update(
@@ -346,7 +373,7 @@ export class ReservationsService {
   ): Date {
     const totalMinutes = durationMinutes + bufferMinutes;
 
-    return new Date(startTime.getTime() + totalMinutes * 60_00);
+    return new Date(startTime.getTime() + totalMinutes * 60_000);
   }
 
   private async findBusyTableIds(
@@ -379,7 +406,7 @@ export class ReservationsService {
       );
 
     if (excludeReservationId !== undefined) {
-      query.andWhere('reservation.id != excludeReservationId', {
+      query.andWhere('reservation.id != :excludeReservationId', {
         excludeReservationId,
       });
     }
