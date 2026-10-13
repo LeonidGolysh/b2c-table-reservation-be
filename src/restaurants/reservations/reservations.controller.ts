@@ -26,9 +26,9 @@ import {
 import { ReservationsService } from './reservations.service';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { CreateReservationDto } from './dto/create-reservation.dto';
-import { UpdateReservationDto } from './dto/update-reservatio.dto';
+import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { ResponseReservationDto } from './dto/response-reservation.dto';
-import { UpdateReservationStatusDto } from './dto/update-reservatio-status.dto';
+import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
 
 @ApiTags('Reservations')
 @ApiBearerAuth()
@@ -55,7 +55,7 @@ export class ReservationsController {
   @ApiOperation({ summary: 'Get a reservation by ID' })
   @ApiParam({ name: 'restaurantId', type: Number })
   @ApiParam({ name: 'reservationId', type: Number })
-  @ApiOkResponse({ type: ResponseReservationDto, isArray: true })
+  @ApiOkResponse({ type: ResponseReservationDto })
   @ApiNotFoundResponse({ description: 'Reservation not found' })
   @Get(':reservationId')
   async findById(
@@ -69,7 +69,7 @@ export class ReservationsController {
   @ApiOperation({
     summary: 'Create a reservation',
     description:
-      'Create a reservation an automatically assigns available tables.',
+      'Creates a reservation and automatically assigns available tables.',
   })
   @ApiParam({
     name: 'restaurantId',
@@ -79,6 +79,7 @@ export class ReservationsController {
   })
   @ApiBody({ type: CreateReservationDto })
   @ApiCreatedResponse({
+    type: ResponseReservationDto,
     description: 'Reservation created successfully',
   })
   @ApiBadRequestResponse({
@@ -91,7 +92,7 @@ export class ReservationsController {
   async create(
     @Param('restaurantId', ParseIntPipe) restaurantId: number,
     @Body() dto: CreateReservationDto,
-  ) {
+  ): Promise<ResponseReservationDto> {
     return this.reservationsService.create(restaurantId, dto);
   }
 
@@ -107,7 +108,8 @@ export class ReservationsController {
     example: 1,
   })
   @ApiBody({ type: UpdateReservationDto })
-  @ApiCreatedResponse({
+  @ApiOkResponse({
+    type: ResponseReservationDto,
     description: 'Reservation updated successfully',
   })
   @ApiBadRequestResponse({
@@ -116,14 +118,14 @@ export class ReservationsController {
   @ApiUnauthorizedResponse({ description: 'User is not authenticated' })
   @ApiNotFoundResponse({ description: 'Reservation not found' })
   @ApiConflictResponse({
-    description: 'reservation cannot be updated or tables unavailable',
+    description: 'Reservation cannot be updated or tables are unavailable',
   })
   @Patch(':reservationId')
   async update(
     @Param('restaurantId', ParseIntPipe) restaurantId: number,
     @Param('reservationId', ParseIntPipe) reservationId: number,
     @Body() dto: UpdateReservationDto,
-  ) {
+  ): Promise<ResponseReservationDto> {
     return this.reservationsService.update(restaurantId, reservationId, dto);
   }
 

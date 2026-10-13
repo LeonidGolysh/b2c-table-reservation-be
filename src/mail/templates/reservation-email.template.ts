@@ -3,8 +3,10 @@ import { ReservationEmail } from '../interface/reservation-email.interface';
 import { renderEmail } from './base-email.template';
 import { formatDate } from './email-format.util';
 
+const QR_CODE_CID = 'reservation-qr';
+
 export type ReservationEmailParams = Omit<ReservationEmail, 'email'> & {
-  checkInUrl?: string;
+  qrCode: Buffer;
 };
 
 export function reservationEmailTemplate(
@@ -18,35 +20,38 @@ export function reservationEmailTemplate(
     startTime,
     guestsCount,
     checkInUrl,
+    qrCode,
   } = params;
+
   const email = renderEmail({
     subject: 'Table reservation',
     heading: 'Table reservation',
     customerName,
     intro: 'We have received your reservation request. Here are the details:',
     details: [
-      {
-        label: 'Restaurant',
-        value: restaurantName,
-      },
-      {
-        label: 'Reservation number',
-        value: String(reservationId),
-      },
+      { label: 'Restaurant', value: restaurantName },
+      { label: 'Reservation number', value: String(reservationId) },
       {
         label: 'Date and time',
-        value: formatDate(startTime),
+        value: formatDate(startTime, { dateStyle: 'long', timeStyle: 'short' }),
       },
-      {
-        label: 'Number of guests',
-        value: String(guestsCount),
-      },
+      { label: 'Number of guests', value: String(guestsCount) },
       ...(customerPhone ? [{ label: 'Phone', value: customerPhone }] : []),
     ],
     outro: 'We look forward to welcoming you!',
-    ...(checkInUrl ? { qrCodeCid: 'reservation-qr' } : {}),
+    qrCodeCid: QR_CODE_CID,
     fallbackUrl: checkInUrl,
   });
 
-  return email;
+  return {
+    ...email,
+    attachments: [
+      {
+        filename: 'reservation-qr.png',
+        content: qrCode,
+        contentType: 'image/png',
+        cid: QR_CODE_CID,
+      },
+    ],
+  };
 }

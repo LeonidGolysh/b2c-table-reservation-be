@@ -6,4 +6,5 @@ export interface ReservationEmail {
   customerPhone?: string;
   startTime: Date;
   guestsCount: number;
+  checkInUrl: string;
 }

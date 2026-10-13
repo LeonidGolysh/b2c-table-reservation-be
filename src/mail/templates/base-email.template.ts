@@ -21,7 +21,16 @@ export interface EmailContent {
 // an optional closing paragraph and a sign-off. Renders both text and HTML
 // from the same content so the two versions can't drift apart.
 export function renderEmail(content: EmailContent): RenderedEmail {
-  const { subject, heading, customerName, intro, details, outro } = content;
+  const {
+    subject,
+    heading,
+    customerName,
+    intro,
+    details,
+    outro,
+    qrCodeCid,
+    fallbackUrl,
+  } = content;
 
   const greeting = `Hello${customerName ? ` ${customerName}` : ''},`;
   const signOff = 'Thank you.';
@@ -33,9 +42,7 @@ export function renderEmail(content: EmailContent): RenderedEmail {
     '',
     ...details.map(({ label, value }) => `${label}: ${value}`),
     ...(outro ? ['', outro] : []),
-    ...(content.fallbackUrl
-      ? ['', 'Check-in link: ', content.fallbackUrl]
-      : []),
+    ...(fallbackUrl ? ['', `Check-in link: ${fallbackUrl}`] : []),
     '',
     signOff,
   ].join('\n');
@@ -62,12 +69,12 @@ export function renderEmail(content: EmailContent): RenderedEmail {
         ${outro ? `<p>${escapeHtml(outro)}</p>\n\n        ` : ''}<p>${signOff}</p>
 
         ${
-          content.qrCodeCid
+          qrCodeCid
             ? `
           <div style="text-align:center;margin-top:24px">
             <p>Show this QR code to the restaurant staff.</p>
             <img
-              src="cid:${escapeHtml(content.qrCodeCid)}"
+              src="cid:${escapeHtml(qrCodeCid)}"
               alt="Reservation QR code"
               width="240"
               height="240"
