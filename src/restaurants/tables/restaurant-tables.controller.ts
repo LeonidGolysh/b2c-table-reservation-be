@@ -8,6 +8,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -23,6 +24,7 @@ import {
   ParseIntPipe,
   Post,
   Put,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -30,6 +32,7 @@ import type { RequestWithUser } from 'src/auth/strategies/jwt/user.request.inter
 import { CreateRestaurantTableDto } from './dto/create-restaurant-table.dto';
 import { UpdateRestaurantTableDto } from './dto/update-restaurant-table.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 
 @ApiTags('Restaurants table')
 @Controller('restaurants/:restaurantId/tables')
@@ -63,12 +66,19 @@ export class RestaurantTablesController {
   @ApiNotFoundResponse({
     description: 'Restaurant not found or does not belong to the current user.',
   })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
   @Get()
   async findAll(
     @Param('restaurantId', ParseIntPipe) restaurantId: number,
     @Req() req: RequestWithUser,
+    @Query() query: PaginationQueryDto,
   ) {
-    return this.restaurantTablesService.findAll(restaurantId, req.user.userId);
+    return this.restaurantTablesService.findAll(
+      restaurantId,
+      req.user.userId,
+      query,
+    );
   }
 
   @ApiOperation({

@@ -8,6 +8,12 @@ import * as bcrypt from 'bcrypt';
 import { ResponseUserDto } from './dto/response-user.dto';
 import { UserNotFoundException } from './exceptions/user-not-found.exception';
 import { UserRole } from './user-role.enum';
+import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import {
+  getPaginationOptions,
+  toPaginatedResponse,
+} from 'src/common/utils/pagination.util';
+import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
 
 @Injectable()
 export class UsersService {
@@ -55,10 +61,21 @@ export class UsersService {
     return user;
   }
 
-  async findAll(): Promise<ResponseUserDto[]> {
-    const users = await this.userRepository.find();
+  async findAll(
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<ResponseUserDto>> {
+    const [users, total] = await this.userRepository.findAndCount({
+      ...getPaginationOptions(query),
+      order: {
+        id: 'ASC',
+      },
+    });
 
-    return users.map((user) => this.mapToResponse(user));
+    return toPaginatedResponse(
+      users.map((user) => this.mapToResponse(user)),
+      total,
+      query,
+    );
   }
 
   async findOne(id: number): Promise<ResponseUserDto> {

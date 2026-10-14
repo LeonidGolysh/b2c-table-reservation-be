@@ -5,13 +5,18 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Query,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiQuery, ApiTags } from '@nestjs/swagger';
 import { MailService } from './mail.service';
 import { SubscriptionPaymentEmailDto } from './dto/subscription-payment-email.dto';
 import { SubscriptionPaymentReminderEmailDto } from './dto/subscripiton-payment-reminder-email.dto';
 import { ReservationEmailDto } from './dto/reservation-email.dto';
 import { ConfigService } from '@nestjs/config';
+import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
+import { ApiPaginatedResponse } from 'src/common/decorator/api-paginated-response.decorator';
+import { EmailResponseDto } from './dto/email-response.dto';
+import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 
 @ApiTags('Email notifications')
 @Controller('emails')
@@ -21,13 +26,20 @@ export class MailController {
     private readonly configService: ConfigService,
   ) {}
 
+  @ApiPaginatedResponse(EmailResponseDto)
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
   @Get()
-  async findAll() {
-    return await this.mailService.findAll();
+  async findAll(
+    @Query() query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<EmailResponseDto>> {
+    return await this.mailService.findAll(query);
   }
 
   @Get(':id')
-  async findOne(@Param('id', ParseIntPipe) id: number) {
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<EmailResponseDto> {
     return this.mailService.findOne(id);
   }
 

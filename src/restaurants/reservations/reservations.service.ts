@@ -19,6 +19,12 @@ import { toResponseReservationDto } from './dto/mapper/response-reservation.mapp
 import { MailService } from 'src/mail/mail.service';
 import { createHash, randomBytes } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
+import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import {
+  getPaginationOptions,
+  toPaginatedResponse,
+} from 'src/common/utils/pagination.util';
+import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
 
 const DEFAULT_DURATION_MINUTES = 120;
 const DEFAULT_BUFFER_MINUTES = 60;
@@ -71,13 +77,29 @@ export class ReservationsService {
     private readonly configService: ConfigService,
   ) {}
 
-  async getAll(restaurantId: number): Promise<ResponseReservationDto[]> {
-    const reservations = await this.reservationQuery(this.dataSource.manager)
+  async getAll(
+    restaurantId: number,
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<ResponseReservationDto>> {
+    const { skip, take } = getPaginationOptions(query);
+
+    // skip/take (not offset/limit) so TypeORM paginates by reservation,
+    // not by joined table rows.
+    const [reservations, total] = await this.reservationQuery(
+      this.dataSource.manager,
+    )
       .where('restaurant.id = :restaurantId', { restaurantId })
       .orderBy('reservation.startTime', 'ASC')
-      .getMany();
+      .addOrderBy('reservation.id', 'ASC')
+      .skip(skip)
+      .take(take)
+      .getManyAndCount();
 
-    return reservations.map(toResponseReservationDto);
+    return toPaginatedResponse(
+      reservations.map(toResponseReservationDto),
+      total,
+      query,
+    );
   }
 
   async findById(

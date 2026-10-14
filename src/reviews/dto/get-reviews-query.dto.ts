@@ -1,29 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsIn, IsOptional } from 'class-validator';
+import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 
-export class GetReviewsQueryDto {
-  @ApiPropertyOptional({
-    example: 1,
-    default: 1,
-  })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number = 1;
-
-  @ApiPropertyOptional({
-    example: 10,
-    default: 10,
-  })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit?: number = 10;
-
+export class GetReviewsQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({
     enum: ['latest', 'oldest', 'rating_asc', 'rating_desc'],
     example: 'latest',

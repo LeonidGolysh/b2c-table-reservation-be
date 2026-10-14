@@ -9,6 +9,12 @@ import { Repository } from 'typeorm';
 import { RestaurantsService } from '../restaurants.service';
 import { CreateRestaurantTableDto } from './dto/create-restaurant-table.dto';
 import { UpdateRestaurantTableDto } from './dto/update-restaurant-table.dto';
+import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import {
+  getPaginationOptions,
+  toPaginatedResponse,
+} from 'src/common/utils/pagination.util';
+import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
 
 @Injectable()
 export class RestaurantTablesService {
@@ -60,7 +66,8 @@ export class RestaurantTablesService {
   async findAll(
     restaurantId: number,
     ownerId: number,
-  ): Promise<RestaurantTable[]> {
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<RestaurantTable>> {
     const restaurant = await this.restaurantService.findByIdAndOwner(
       restaurantId,
       ownerId,
@@ -70,16 +77,19 @@ export class RestaurantTablesService {
       throw new NotFoundException('Restaurant not found');
     }
 
-    return this.restaurantTableRepository.find({
+    const [tables, total] = await this.restaurantTableRepository.findAndCount({
       where: {
         restaurant: {
           id: restaurantId,
         },
       },
+      ...getPaginationOptions(query),
       order: {
         tableNumber: 'ASC',
       },
     });
+
+    return toPaginatedResponse(tables, total, query);
   }
 
   async findOne(

@@ -18,6 +18,13 @@ import { EmailStatus } from './enum/email-status.enum';
 import { reservationEmailTemplate } from './templates/reservation-email.template';
 import { ReservationEmail } from './interface/reservation-email.interface';
 import * as QRCode from 'qrcode';
+import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
+import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import {
+  getPaginationOptions,
+  toPaginatedResponse,
+} from 'src/common/utils/pagination.util';
+import { EmailResponseDto } from './dto/email-response.dto';
 
 @Injectable()
 export class MailService implements OnModuleInit {
@@ -43,6 +50,18 @@ export class MailService implements OnModuleInit {
       secure: true,
       auth: { user, pass },
     });
+  }
+
+  private mapToResponse(email: Email): EmailResponseDto {
+    return {
+      id: email.id,
+      recipientEmail: email.recipientEmail,
+      type: email.type,
+      status: email.status,
+      providerMessageId: email.providerMessageId,
+      createdAt: email.createdAt,
+      updatedAt: email.updatedAt,
+    };
   }
 
   async onModuleInit(): Promise<void> {
@@ -94,15 +113,23 @@ export class MailService implements OnModuleInit {
     }
   }
 
-  async findAll(): Promise<Email[]> {
-    return this.emailRepository.find({
+  async findAll(
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<EmailResponseDto>> {
+    const [emails, total] = await this.emailRepository.findAndCount({
+      ...getPaginationOptions(query),
       order: {
         createdAt: 'DESC',
       },
     });
+    return toPaginatedResponse(
+      emails.map((email) => this.mapToResponse(email)),
+      total,
+      query,
+    );
   }
 
-  async findOne(id: number): Promise<Email> {
+  async findOne(id: number): Promise<EmailResponseDto> {
     const email = await this.emailRepository.findOne({
       where: { id },
     });
@@ -111,7 +138,7 @@ export class MailService implements OnModuleInit {
       throw new NotFoundException('Email not found');
     }
 
-    return email;
+    return this.mapToResponse(email);
   }
 
   async sendSubscriptionPaymentEmail({

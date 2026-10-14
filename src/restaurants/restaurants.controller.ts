@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   Post,
   Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -16,6 +17,7 @@ import {
   ApiConflictResponse,
   ApiNotFoundResponse,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -26,6 +28,9 @@ import { ErrorResponseDto } from 'src/common/dto/error-response.dto';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
+import { ApiPaginatedResponse } from 'src/common/decorator/api-paginated-response.decorator';
 
 @ApiTags('Restaurants')
 @Controller('restaurants')
@@ -54,15 +59,17 @@ export class RestaurantsController {
   }
 
   @ApiOperation({ summary: 'Get all restaurants' })
-  @ApiResponse({
-    status: 200,
-    description: 'Restaurants retrieved successfully',
-    type: ResponseRestaurantDto,
-    isArray: true,
-  })
+  @ApiPaginatedResponse(
+    ResponseRestaurantDto,
+    'Restaurants retrieved successfully',
+  )
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
   @Get()
-  findAll(): Promise<ResponseRestaurantDto[]> {
-    return this.restaurantsService.findAll();
+  findAll(
+    @Query() query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<ResponseRestaurantDto>> {
+    return this.restaurantsService.findAll(query);
   }
 
   @ApiOperation({ summary: 'Get restaurant by id' })
