@@ -10,6 +10,10 @@ import { PaymentResponseDto } from './dto/payment-response.dto';
 import { PaymentStatus } from 'src/payments/payment-status.enum';
 import { Subscription } from 'src/subscriptions/subscription.entity';
 import { BillingSubscriptionResponseDto } from './dto/billing-subscription-response.dto';
+import { CheckoutResponseDto } from './dto/checkout-response.dto';
+import { SubscriptionsService } from 'src/subscriptions/subscriptions.service';
+import { SubscriptionNotFoundException } from 'src/subscriptions/exceptions/subscription-not-found.exception';
+import { StripeService } from 'src/stripe/stripe.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -18,6 +22,8 @@ export class BillingsService {
   constructor(
     private readonly restaurantsService: RestaurantsService,
     private readonly paymentService: PaymentService,
+    private readonly subscriptionsService: SubscriptionsService,
+    private readonly stripeService: StripeService,
   ) {}
 
   private mapSubscription(
@@ -102,5 +108,31 @@ export class BillingsService {
         ? this.mapSubscription(restaurant.subscriptions)
         : null,
     }));
+  }
+
+  async checkout(
+    restaurantId: number,
+    ownerId: number,
+  ): Promise<CheckoutResponseDto> {
+    const restaurant = await this.restaurantsService.findOwnedByIdOrThrow(
+      restaurantId,
+      ownerId,
+      { subscriptions: true },
+    );
+
+    if (!restaurant.subscriptions) {
+      throw new SubscriptionNotFoundException();
+    }
+
+    const subscription = await this.subscriptionsService.startCheckout(
+      restaurant.subscriptions.id,
+    );
+
+    const session =
+      await this.stripeService.createCheckoutSession(subscription);
+
+    return {
+      checkoutUrl: session.url,
+    };
   }
 }

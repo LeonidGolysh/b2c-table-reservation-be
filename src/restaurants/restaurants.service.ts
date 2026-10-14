@@ -8,9 +8,7 @@ import { UserRole } from 'src/users/user-role.enum';
 import { RestaurantNotFoundException } from './exceptions/restaurant-not-found.exception';
 import { ResponseRestaurantDto } from './dto/response-restaurant.dto';
 import { SubscriptionsService } from 'src/subscriptions/subscriptions.service';
-import { SubscriptionNotFoundException } from 'src/subscriptions/exceptions/subscription-not-found.exception';
 import { DataSource } from 'typeorm';
-import { StripeService } from 'src/stripe/stripe.service';
 import {
   BadRequestException,
   forwardRef,
@@ -47,7 +45,6 @@ export class RestaurantsService {
     private readonly subscriptionService: SubscriptionsService,
 
     private readonly dataSource: DataSource,
-    private readonly stripeService: StripeService,
   ) {}
 
   private mapToResponse(restaurant: Restaurant): ResponseRestaurantDto {
@@ -233,27 +230,6 @@ export class RestaurantsService {
 
     return {
       message: 'Restaurant deleted successfully',
-    };
-  }
-
-  async checkout(restaurantId: number) {
-    const restaurant = await this.findByIdOrThrow(restaurantId, {
-      subscriptions: true,
-    });
-
-    if (!restaurant.subscriptions) {
-      throw new SubscriptionNotFoundException();
-    }
-
-    const subscription = await this.subscriptionService.startCheckout(
-      restaurant.subscriptions.id,
-    );
-
-    const session =
-      await this.stripeService.createCheckoutSession(subscription);
-
-    return {
-      checkoutUrl: session.url,
     };
   }
 }
