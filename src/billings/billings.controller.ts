@@ -3,6 +3,7 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -10,7 +11,9 @@ import { BillingsService } from './billings.service';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import type { RequestWithUser } from 'src/auth/strategies/jwt/user.request.interface';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -21,6 +24,7 @@ import {
 import { BillingRestaurantResponseDto } from './dto/billing-restaurant-response.dto';
 import { CurrentBillingResponseDto } from './dto/current-billing-response.dto';
 import { PaymentResponseDto } from './dto/payment-response.dto';
+import { CheckoutResponseDto } from './dto/checkout-response.dto';
 
 @ApiTags('Billings')
 @Controller('billing')
@@ -111,5 +115,37 @@ export class BillingsController {
       restaurantId,
       req.user.userId,
     );
+  }
+
+  @ApiOperation({
+    summary: 'Start subscription checkout',
+    description:
+      'Creates a Stripe Checkout session to pay for the subscription of a restaurant belonging to the authenticated owner.',
+  })
+  @ApiParam({
+    name: 'restaurantId',
+    type: Number,
+    example: 1,
+    description: 'Restaurant ID',
+  })
+  @ApiCreatedResponse({
+    description: 'Stripe Checkout session created',
+    type: CheckoutResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: 'Subscription is already in checkout or active',
+  })
+  @ApiUnauthorizedResponse({
+    description: 'JWT token is missing or invalid',
+  })
+  @ApiNotFoundResponse({
+    description: 'Restaurant or subscription was not found',
+  })
+  @Post('restaurants/:restaurantId/checkout')
+  checkout(
+    @Param('restaurantId', ParseIntPipe) restaurantId: number,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.billingsService.checkout(restaurantId, req.user.userId);
   }
 }
