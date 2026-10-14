@@ -18,6 +18,12 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { UsersService } from 'src/users/users.service';
+import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import {
+  getPaginationOptions,
+  toPaginatedResponse,
+} from 'src/common/utils/pagination.util';
+import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
 
 // Relations needed to build a ResponseRestaurantDto.
 const RESPONSE_RELATIONS: FindOptionsRelations<Restaurant> = {
@@ -139,12 +145,22 @@ export class RestaurantsService {
     return this.findOne(savedId);
   }
 
-  async findAll(): Promise<ResponseRestaurantDto[]> {
-    const restaurants = await this.restaurantRepository.find({
+  async findAll(
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<ResponseRestaurantDto>> {
+    const [restaurants, total] = await this.restaurantRepository.findAndCount({
       relations: RESPONSE_RELATIONS,
+      ...getPaginationOptions(query),
+      order: {
+        id: 'ASC',
+      },
     });
 
-    return restaurants.map((restaurant) => this.mapToResponse(restaurant));
+    return toPaginatedResponse(
+      restaurants.map((restaurant) => this.mapToResponse(restaurant)),
+      total,
+      query,
+    );
   }
 
   async findOne(id: number): Promise<ResponseRestaurantDto> {

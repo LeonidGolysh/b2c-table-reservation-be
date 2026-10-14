@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -20,6 +21,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -29,6 +31,9 @@ import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { ResponseReservationDto } from './dto/response-reservation.dto';
 import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
+import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
+import { ApiPaginatedResponse } from 'src/common/decorator/api-paginated-response.decorator';
 
 @ApiTags('Reservations')
 @ApiBearerAuth()
@@ -44,12 +49,15 @@ export class ReservationsController {
     description: 'Restaurant ID',
     example: 1,
   })
-  @ApiOkResponse({ type: ResponseReservationDto, isArray: true })
+  @ApiPaginatedResponse(ResponseReservationDto)
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
   @Get()
   async findAll(
     @Param('restaurantId', ParseIntPipe) restaurantId: number,
-  ): Promise<ResponseReservationDto[]> {
-    return this.reservationsService.getAll(restaurantId);
+    @Query() query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<ResponseReservationDto>> {
+    return this.reservationsService.getAll(restaurantId, query);
   }
 
   @ApiOperation({ summary: 'Get a reservation by ID' })

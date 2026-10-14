@@ -13,6 +13,11 @@ import { ResponseReviewsDto } from './dto/response-review.dto';
 import { GetReviewsQueryDto } from './dto/get-reviews-query.dto';
 import { RestaurantsService } from 'src/restaurants/restaurants.service';
 import { UsersService } from 'src/users/users.service';
+import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
+import {
+  getPaginationOptions,
+  toPaginatedResponse,
+} from 'src/common/utils/pagination.util';
 
 const REVIEW_SORT_ORDER: Record<
   NonNullable<GetReviewsQueryDto['sort']>,
@@ -96,10 +101,11 @@ export class ReviewsService {
     return this.mapToResponse(reviewWithRelations);
   }
 
-  async findByRestaurant(restaurantId: number, query: GetReviewsQueryDto) {
-    const { page = 1, limit = 10, sort = 'latest' } = query;
-
-    const order = REVIEW_SORT_ORDER[sort];
+  async findByRestaurant(
+    restaurantId: number,
+    query: GetReviewsQueryDto,
+  ): Promise<PaginatedResponse<ResponseReviewsDto>> {
+    const order = REVIEW_SORT_ORDER[query.sort ?? 'latest'];
 
     const [reviews, total] = await this.reviewRepository.findAndCount({
       where: {
@@ -111,16 +117,14 @@ export class ReviewsService {
         user: true,
       },
       order,
-      skip: (page - 1) * limit,
-      take: limit,
+      ...getPaginationOptions(query),
     });
 
-    return {
-      data: reviews.map((review) => this.mapToResponse(review)),
+    return toPaginatedResponse(
+      reviews.map((review) => this.mapToResponse(review)),
       total,
-      page,
-      limit,
-    };
+      query,
+    );
   }
 
   async remove(id: number) {

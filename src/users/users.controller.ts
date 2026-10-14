@@ -6,6 +6,7 @@ import {
   Param,
   Delete,
   Put,
+  Query,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -16,12 +17,16 @@ import {
   ApiConflictResponse,
   ApiNotFoundResponse,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { ResponseUserDto } from './dto/response-user.dto';
 import { ErrorResponseDto } from 'src/common/dto/error-response.dto';
 import { ValidationErrorResponse } from 'src/common/dto/validation-error-response.dto';
+import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
+import { ApiPaginatedResponse } from 'src/common/decorator/api-paginated-response.decorator';
 
 @ApiTags('Users')
 @Controller('users')
@@ -55,15 +60,14 @@ export class UsersController {
   }
 
   @ApiOperation({ summary: 'Get all users' })
-  @ApiResponse({
-    status: 200,
-    description: 'Users found',
-    type: ResponseUserDto,
-    isArray: true,
-  })
+  @ApiPaginatedResponse(ResponseUserDto, 'Users found')
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
   @Get()
-  findAll() {
-    return this.usersService.findAll();
+  findAll(
+    @Query() query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<ResponseUserDto>> {
+    return this.usersService.findAll(query);
   }
 
   @ApiOperation({ summary: 'Get user by id' })
