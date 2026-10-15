@@ -7,7 +7,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { UserRole } from './user-role.enum';
-import { Review } from 'src/reviews/review.entity';
+import { Review } from '../reviews/review.entity';
 
 @Entity('users')
 export class User {

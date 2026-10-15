@@ -1,4 +1,4 @@
-import { Restaurant } from 'src/restaurants/entity/restaurant.entity';
+import { Restaurant } from '../restaurants/entity/restaurant.entity';
 import {
   Column,
   CreateDateColumn,
@@ -11,7 +11,7 @@ import {
 } from 'typeorm';
 import { SubscriptionStatus } from './enum/subscription-status.enum';
 import { SubscriptionPlan } from './enum/subscription-plan.enum';
-import { Payment } from 'src/payments/payment.entity';
+import { Payment } from '../payments/payment.entity';
 import { SubscriptionRenewalType } from './enum/subscription-renewal-type.enum';
 
 @Entity('subscriptions')

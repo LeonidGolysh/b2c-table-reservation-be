@@ -1,4 +1,4 @@
-import { Restaurant } from 'src/restaurants/entity/restaurant.entity';
+import { Restaurant } from '../../../restaurants/entity/restaurant.entity';
 import {
   Column,
   Entity,
@@ -7,7 +7,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { RestaurantTableStatus } from '../enum/restaurant-table-status.enum';
-import { ReservationTable } from 'src/restaurants/reservations/entity/reservation-table.entity';
+import { ReservationTable } from '../../../restaurants/reservations/entity/reservation-table.entity';
 
 @Entity('restaurant_tables')
 export class RestaurantTable {

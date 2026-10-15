@@ -9,7 +9,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { ReservationStatus } from '../enum/reservation-status.enum';
-import { Restaurant } from 'src/restaurants/entity/restaurant.entity';
+import { Restaurant } from '../../../restaurants/entity/restaurant.entity';
 import { ReservationTable } from './reservation-table.entity';
 
 @Entity('reservations')
