@@ -23,4 +23,7 @@ export class ResponseRestaurantDto {
 
   @ApiProperty({ example: 'MNL' })
   renewalType: string;
+
+  @ApiProperty({ example: 'INPR' })
+  onboardingStatus: string;
 }

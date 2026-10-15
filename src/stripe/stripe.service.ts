@@ -9,6 +9,7 @@ import { StripeEvent } from './stripe-event.entity';
 import { PaymentService } from 'src/payments/payments.service';
 import { MailQueueService } from 'src/mail/mail.queue.service';
 import { InvoiceWithSubscription } from 'src/subscriptions/interface/invoice-subscription.interface';
+import { RestaurantsService } from 'src/restaurants/restaurants.service';
 
 @Injectable()
 export class StripeService {
@@ -22,6 +23,7 @@ export class StripeService {
     private readonly subscriptionService: SubscriptionsService,
     private readonly paymentService: PaymentService,
     private readonly mailQueueService: MailQueueService,
+    private readonly restaurantService: RestaurantsService,
   ) {
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
       apiVersion: '2026-05-27.dahlia',
@@ -122,13 +124,14 @@ export class StripeService {
     }
 
     const session = event.data.object as Stripe.Checkout.Session;
+
+    await this.handleCheckoutCompleted(session);
+
     const inserted = await this.markAsProcessed(event);
 
     if (!inserted) {
       return;
     }
-
-    await this.handleCheckoutCompleted(session);
   }
 
   private async handleCheckoutSessionExpired(event: Stripe.Event) {
@@ -165,15 +168,32 @@ export class StripeService {
     return result.identifiers.length > 0;
   }
 
-  private async handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-    const subscriptionId = session.metadata?.subscriptionId;
+  private async handleCheckoutCompleted(
+    session: Stripe.Checkout.Session,
+  ): Promise<void> {
+    if (session.payment_status !== 'paid') {
+      this.logger.warn(`Checkout session ${session.id} is not paid yet`);
+    }
+    const subscriptionId = Number(session.metadata?.subscriptionId);
 
-    if (!subscriptionId) {
+    if (!Number.isInteger(subscriptionId) || subscriptionId <= 0) {
       throw new BadRequestException('No subscriptionId in metadata');
     }
 
-    const stripeCustomerId = session.customer as string;
-    const stripeSubscriptionId = session.subscription as string;
+    const stripeCustomerId =
+      typeof session.customer === 'string'
+        ? session.customer
+        : session.customer?.id;
+    const stripeSubscriptionId =
+      typeof session.subscription === 'string'
+        ? session.subscription
+        : session.subscription?.id;
+
+    if (!stripeCustomerId || !stripeSubscriptionId) {
+      throw new BadRequestException(
+        'Stripe customer or subscription is missing',
+      );
+    }
 
     await this.subscriptionService.attachStripeData(
       Number(subscriptionId),
@@ -185,10 +205,16 @@ export class StripeService {
       await this.getSubscriptionPeriodEnd(stripeSubscriptionId);
 
     const payment = await this.paymentService.createFromCheckout(session);
+
     await this.subscriptionService.activeSubscription(
       Number(subscriptionId),
       stripePeriodEnd,
     );
+
+    const subscription =
+      await this.subscriptionService.findById(subscriptionId);
+
+    await this.restaurantService.completeOnboarding(subscription.restaurant.id);
 
     try {
       await this.mailQueueService.enqueueSubscriptionPaymentEmail(payment.id);

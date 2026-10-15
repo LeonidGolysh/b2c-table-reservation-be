@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -130,6 +131,12 @@ export class BillingsService {
 
     const session =
       await this.stripeService.createCheckoutSession(subscription);
+
+    if (!session.url) {
+      throw new BadRequestException('Stripe checkout URL was not returned');
+    }
+
+    await this.restaurantsService.markPending(restaurant.id);
 
     return {
       checkoutUrl: session.url,

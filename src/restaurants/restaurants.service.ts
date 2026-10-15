@@ -22,6 +22,7 @@ import {
   toPaginatedResponse,
 } from 'src/common/utils/pagination.util';
 import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
+import { OnboardingStatus } from './enum/onboarding-status.emun';
 
 // Relations needed to build a ResponseRestaurantDto.
 const RESPONSE_RELATIONS: FindOptionsRelations<Restaurant> = {
@@ -54,6 +55,7 @@ export class RestaurantsService {
       description: restaurant.description,
       isActive: restaurant.isActive,
       renewalType: restaurant.subscriptions.renewalType,
+      onboardingStatus: restaurant.onboardingStatus,
 
       owner: {
         id: restaurant.owner.id,
@@ -116,6 +118,7 @@ export class RestaurantsService {
         name: dto.name,
         description: dto.description,
         owner,
+        onboardingStatus: OnboardingStatus.IN_PROGRESS,
       });
 
       const savedRestaurant = await manager.save(restaurant);
@@ -140,6 +143,30 @@ export class RestaurantsService {
     });
 
     return this.findOne(savedId);
+  }
+
+  async markPending(restaurantId: number): Promise<void> {
+    await this.restaurantRepository.update(
+      {
+        id: restaurantId,
+        onboardingStatus: OnboardingStatus.IN_PROGRESS,
+      },
+      {
+        onboardingStatus: OnboardingStatus.PAYMENT_PENDING,
+      },
+    );
+  }
+
+  async completeOnboarding(restaurantId: number): Promise<void> {
+    await this.restaurantRepository.update(
+      {
+        id: restaurantId,
+        onboardingStatus: OnboardingStatus.PAYMENT_PENDING,
+      },
+      {
+        onboardingStatus: OnboardingStatus.COMPLETED,
+      },
+    );
   }
 
   async findAll(

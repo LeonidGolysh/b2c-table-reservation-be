@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   forwardRef,
   Inject,
   Injectable,
@@ -66,6 +67,10 @@ export class PaymentService {
   }
 
   async createFromCheckout(session: Stripe.Checkout.Session) {
+    if (session.payment_status !== 'paid') {
+      throw new BadRequestException('Checkout payment is not completed');
+    }
+
     const existing = await this.paymentRepository.findOne({
       where: { stripeSessionId: session.id },
     });
@@ -75,6 +80,11 @@ export class PaymentService {
     }
 
     const subscriptionId = Number(session.metadata?.subscriptionId);
+
+    if (!Number.isInteger(subscriptionId) || subscriptionId <= 0) {
+      throw new BadRequestException('Invalid subscription data in metadata');
+    }
+
     const subscription =
       await this.subscriptionsService.findById(subscriptionId);
 

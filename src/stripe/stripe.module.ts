@@ -6,6 +6,7 @@ import { SubscriptionsModule } from 'src/subscriptions/subscriptions.module';
 import { StripeEvent } from './stripe-event.entity';
 import { PaymentModule } from 'src/payments/payments.module';
 import { MailModule } from 'src/mail/mail.module';
+import { RestaurantsModule } from 'src/restaurants/restaurants.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { MailModule } from 'src/mail/mail.module';
     MailModule,
     SubscriptionsModule,
     PaymentModule,
+    RestaurantsModule,
   ],
   providers: [StripeService],
   controllers: [StripeController],
