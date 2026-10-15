@@ -1,4 +1,4 @@
-import { User } from 'src/users/user.entity';
+import { User } from '../../users/user.entity';
 import {
   Column,
   CreateDateColumn,
@@ -11,9 +11,9 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { RestaurantAddresses } from './restaurant-addresses.entity';
-import { Review } from 'src/reviews/review.entity';
-import { Subscription } from 'src/subscriptions/subscription.entity';
-import { Payment } from 'src/payments/payment.entity';
+import { Review } from '../../reviews/review.entity';
+import { Subscription } from '../../subscriptions/subscription.entity';
+import { Payment } from '../../payments/payment.entity';
 import { RestaurantTable } from '../tables/entity/restaurant-table.entity';
 
 @Entity('restaurants')

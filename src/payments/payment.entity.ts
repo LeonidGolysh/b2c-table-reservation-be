@@ -1,5 +1,5 @@
-import { Restaurant } from 'src/restaurants/entity/restaurant.entity';
-import { Subscription } from 'src/subscriptions/subscription.entity';
+import { Restaurant } from '../restaurants/entity/restaurant.entity';
+import { Subscription } from '../subscriptions/subscription.entity';
 import {
   Column,
   CreateDateColumn,
