@@ -1,23 +1,23 @@
 services:
-  backend:
-    build: .
-    container_name: backend
-    ports:
-      - "3000:3000"
-    depends_on:
-      - postgres
-      - redis
-    environment:
-      DATABASE_HOST: postgres
-      DATABASE_PORT: 5432
-      DATABASE_USER: postgres
-      DATABASE_PASSWORD: postgres
-      DATABASE_NAME: mydb
-    volumes:
-      - .:/app
-      - /app/node_modules
-    env_file:
-      - .env
+  # backend:
+  #   build: .
+  #   container_name: backend
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #   environment:
+  #     DATABASE_HOST: postgres
+  #     DATABASE_PORT: 5432
+  #     DATABASE_USER: postgres
+  #     DATABASE_PASSWORD: postgres
+  #     DATABASE_NAME: mydb
+  #   volumes:
+  #     - .:/app
+  #     - /app/node_modules
+  #   env_file:
+  #     - .env
     
   postgres:
     image: postgres:16
