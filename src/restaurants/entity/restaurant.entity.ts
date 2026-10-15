@@ -15,6 +15,7 @@ import { Review } from '../../reviews/review.entity';
 import { Subscription } from '../../subscriptions/subscription.entity';
 import { Payment } from '../../payments/payment.entity';
 import { RestaurantTable } from '../tables/entity/restaurant-table.entity';
+import { OnboardingStatus } from '../enum/onboarding-status.emun';
 
 @Entity('restaurants')
 export class Restaurant {
@@ -60,4 +61,12 @@ export class Restaurant {
 
   @OneToMany(() => RestaurantTable, (table) => table.restaurant)
   tables: RestaurantTable[];
+
+  @Column({
+    type: 'enum',
+    enum: OnboardingStatus,
+    default: OnboardingStatus.IN_PROGRESS,
+    name: 'onboarding_status',
+  })
+  onboardingStatus: OnboardingStatus;
 }
