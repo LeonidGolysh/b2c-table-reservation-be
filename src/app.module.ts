@@ -13,6 +13,8 @@ import { BillingsModule } from './billings/billings.module';
 import { MailModule } from './mail/mail.module';
 import { RestaurantTablesModule } from './restaurants/tables/restaurant-tables.module';
 import { ReservationsModule } from './restaurants/reservations/reservations.module';
+import { WorkersModule } from './workers/workers.module';
+import { EmployeesModule } from './restaurants/employees/employees.module';
 
 @Module({
   imports: [
@@ -32,6 +34,7 @@ import { ReservationsModule } from './restaurants/reservations/reservations.modu
     }),
     AuthModule,
     UsersModule,
+    WorkersModule,
     RestaurantsModule,
     ReviewsModule,
     SubscriptionsModule,
@@ -41,6 +44,7 @@ import { ReservationsModule } from './restaurants/reservations/reservations.modu
     MailModule,
     RestaurantTablesModule,
     ReservationsModule,
+    EmployeesModule,
   ],
 })
 export class AppModule {}

@@ -28,15 +28,19 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import type { RequestWithUser } from 'src/auth/strategies/jwt/user.request.interface';
+import type { RequestWithUser } from 'src/auth/strategies/jwt/interface/user.request.interface';
 import { CreateRestaurantTableDto } from './dto/create-restaurant-table.dto';
 import { UpdateRestaurantTableDto } from './dto/update-restaurant-table.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Roles } from 'src/auth/decorator/roles.decorator';
+import { WorkerRole } from 'src/workers/enum/worker-role.enum';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 
 @ApiTags('Restaurants table')
 @Controller('restaurants/:restaurantId/tables')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(WorkerRole.OWNER, WorkerRole.MANAGER, WorkerRole.STAFF)
 @ApiBearerAuth()
 export class RestaurantTablesController {
   constructor(
@@ -46,7 +50,7 @@ export class RestaurantTablesController {
   @ApiOperation({
     summary: 'Get all tables of a restaurant',
     description:
-      'Returns all tables belonging to a restaurant owned by the authenticated user',
+      'Returns all tables of a restaurant the authenticated owner or employee has access to',
   })
   @ApiParam({
     name: 'restaurantId',
@@ -74,11 +78,7 @@ export class RestaurantTablesController {
     @Req() req: RequestWithUser,
     @Query() query: PaginationQueryDto,
   ) {
-    return this.restaurantTablesService.findAll(
-      restaurantId,
-      req.user.userId,
-      query,
-    );
+    return this.restaurantTablesService.findAll(restaurantId, req.user, query);
   }
 
   @ApiOperation({
@@ -112,14 +112,14 @@ export class RestaurantTablesController {
     return this.restaurantTablesService.findOne(
       restaurantId,
       tableId,
-      req.user.userId,
+      req.user,
     );
   }
 
   @ApiOperation({
     summary: 'Create table',
     description:
-      'Create a table in a restaurant owned by the authenticated user',
+      'Create a table in a restaurant the authenticated owner or manager has access to',
   })
   @ApiParam({
     name: 'restaurantId',
@@ -145,17 +145,14 @@ export class RestaurantTablesController {
   @ApiConflictResponse({
     description: 'A table with this number already exists in this restaurant.',
   })
+  @Roles(WorkerRole.OWNER, WorkerRole.MANAGER)
   @Post()
   async create(
     @Param('restaurantId', ParseIntPipe) restaurantId: number,
     @Body() dto: CreateRestaurantTableDto,
     @Req() req: RequestWithUser,
   ) {
-    return this.restaurantTablesService.create(
-      restaurantId,
-      req.user.userId,
-      dto,
-    );
+    return this.restaurantTablesService.create(restaurantId, req.user, dto);
   }
 
   @ApiOperation({
@@ -185,6 +182,7 @@ export class RestaurantTablesController {
   @ApiConflictResponse({
     description: 'A table with the requested number already exists.',
   })
+  @Roles(WorkerRole.OWNER, WorkerRole.MANAGER)
   @Put(':tableId')
   async update(
     @Param('restaurantId', ParseIntPipe) restaurantId: number,
@@ -195,7 +193,7 @@ export class RestaurantTablesController {
     return this.restaurantTablesService.update(
       restaurantId,
       tableId,
-      req.user.userId,
+      req.user,
       dto,
     );
   }
@@ -226,16 +224,13 @@ export class RestaurantTablesController {
     description: 'Authentication token is missing or invalid.',
   })
   @ApiNotFoundResponse({ description: 'Restaurant or table not found.' })
+  @Roles(WorkerRole.OWNER, WorkerRole.MANAGER)
   @Delete(':tableId')
   async remove(
     @Param('restaurantId', ParseIntPipe) restaurantId: number,
     @Param('tableId', ParseIntPipe) tableId: number,
     @Req() req: RequestWithUser,
   ) {
-    return this.restaurantTablesService.remove(
-      restaurantId,
-      tableId,
-      req.user.userId,
-    );
+    return this.restaurantTablesService.remove(restaurantId, tableId, req.user);
   }
 }

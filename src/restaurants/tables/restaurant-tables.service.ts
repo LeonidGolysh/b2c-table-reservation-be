@@ -15,6 +15,7 @@ import {
   toPaginatedResponse,
 } from 'src/common/utils/pagination.util';
 import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
+import type { AuthUser } from 'src/auth/strategies/jwt/interface/user.request.interface';
 
 @Injectable()
 export class RestaurantTablesService {
@@ -26,18 +27,14 @@ export class RestaurantTablesService {
   ) {}
 
   async create(
-    restaurantId,
-    ownerId,
+    restaurantId: number,
+    actor: AuthUser,
     dto: CreateRestaurantTableDto,
   ): Promise<RestaurantTable> {
-    const restaurant = await this.restaurantService.findByIdAndOwner(
+    const restaurant = await this.restaurantService.findAccessibleOrThrow(
       restaurantId,
-      ownerId,
+      actor,
     );
-
-    if (!restaurant) {
-      throw new NotFoundException('Restaurant not found');
-    }
 
     const existingTable = await this.restaurantTableRepository.findOne({
       where: {
@@ -65,17 +62,10 @@ export class RestaurantTablesService {
 
   async findAll(
     restaurantId: number,
-    ownerId: number,
+    actor: AuthUser,
     query: PaginationQueryDto,
   ): Promise<PaginatedResponse<RestaurantTable>> {
-    const restaurant = await this.restaurantService.findByIdAndOwner(
-      restaurantId,
-      ownerId,
-    );
-
-    if (!restaurant) {
-      throw new NotFoundException('Restaurant not found');
-    }
+    await this.restaurantService.findAccessibleOrThrow(restaurantId, actor);
 
     const [tables, total] = await this.restaurantTableRepository.findAndCount({
       where: {
@@ -95,16 +85,9 @@ export class RestaurantTablesService {
   async findOne(
     restaurantId: number,
     tableId: number,
-    ownerId: number,
+    actor: AuthUser,
   ): Promise<RestaurantTable> {
-    const restaurant = await this.restaurantService.findByIdAndOwner(
-      restaurantId,
-      ownerId,
-    );
-
-    if (!restaurant) {
-      throw new NotFoundException('Restaurant not found');
-    }
+    await this.restaurantService.findAccessibleOrThrow(restaurantId, actor);
 
     const table = await this.restaurantTableRepository.findOne({
       where: {
@@ -125,10 +108,10 @@ export class RestaurantTablesService {
   async update(
     restaurantId: number,
     tableId: number,
-    ownerId: number,
+    actor: AuthUser,
     dto: UpdateRestaurantTableDto,
   ): Promise<RestaurantTable> {
-    const table = await this.findOne(restaurantId, tableId, ownerId);
+    const table = await this.findOne(restaurantId, tableId, actor);
 
     if (
       dto.tableNumber !== undefined &&
@@ -158,9 +141,9 @@ export class RestaurantTablesService {
   async remove(
     restaurantId: number,
     tableId: number,
-    ownerId: number,
+    actor: AuthUser,
   ): Promise<void> {
-    const table = await this.findOne(restaurantId, tableId, ownerId);
+    const table = await this.findOne(restaurantId, tableId, actor);
 
     await this.restaurantTableRepository.remove(table);
   }

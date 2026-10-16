@@ -2,7 +2,7 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import {
   AuthUser,
   RequestWithUser,
-} from '../strategies/jwt/user.request.interface';
+} from '../strategies/jwt/interface/user.request.interface';
 
 export const CurrentUser = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): AuthUser => {

@@ -19,12 +19,13 @@ import {
 import { CreateReviewDto } from './dto/create-review.dto';
 import { CurrentUser } from 'src/auth/decorator/current-user.decorator';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { CustomerGuard } from 'src/auth/guards/account-kind.guard';
 import { ResponseReviewsDto } from './dto/response-review.dto';
 import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
 import { ApiPaginatedResponse } from 'src/common/decorator/api-paginated-response.decorator';
 import { GetReviewsQueryDto } from './dto/get-reviews-query.dto';
 import { ErrorResponseDto } from 'src/common/dto/error-response.dto';
-import type { AuthUser } from 'src/auth/strategies/jwt/user.request.interface';
+import type { AuthUser } from 'src/auth/strategies/jwt/interface/user.request.interface';
 
 @Controller('restaurants/:restaurantId/reviews')
 export class ReviewsController {
@@ -33,7 +34,8 @@ export class ReviewsController {
   @ApiOperation({
     summary: 'Add rate with comment',
   })
-  @UseGuards(JwtAuthGuard)
+  // Only customers can leave reviews, never business accounts.
+  @UseGuards(JwtAuthGuard, CustomerGuard)
   @ApiBearerAuth()
   @Post()
   create(

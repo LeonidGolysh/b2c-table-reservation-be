@@ -4,18 +4,12 @@ import { FindOptionsRelations, Repository } from 'typeorm';
 import { RestaurantAddresses } from './entity/restaurant-addresses.entity';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
-import { UserRole } from 'src/users/user-role.enum';
 import { RestaurantNotFoundException } from './exceptions/restaurant-not-found.exception';
 import { ResponseRestaurantDto } from './dto/response-restaurant.dto';
 import { SubscriptionsService } from 'src/subscriptions/subscriptions.service';
 import { DataSource } from 'typeorm';
-import {
-  BadRequestException,
-  forwardRef,
-  Inject,
-  Injectable,
-} from '@nestjs/common';
-import { UsersService } from 'src/users/users.service';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
+import { WorkersService } from 'src/workers/workers.service';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 import {
   getPaginationOptions,
@@ -23,6 +17,9 @@ import {
 } from 'src/common/utils/pagination.util';
 import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
 import { OnboardingStatus } from './enum/onboarding-status.emun';
+import { AccountKind } from 'src/auth/enum/account-kind.enum';
+import { WorkerRole } from 'src/workers/enum/worker-role.enum';
+import type { AuthUser } from 'src/auth/strategies/jwt/interface/user.request.interface';
 
 // Relations needed to build a ResponseRestaurantDto.
 const RESPONSE_RELATIONS: FindOptionsRelations<Restaurant> = {
@@ -40,12 +37,11 @@ export class RestaurantsService {
     @InjectRepository(RestaurantAddresses)
     private addressesRepository: Repository<RestaurantAddresses>,
 
-    private readonly usersService: UsersService,
-
     @Inject(forwardRef(() => SubscriptionsService))
     private readonly subscriptionService: SubscriptionsService,
 
     private readonly dataSource: DataSource,
+    private readonly workersService: WorkersService,
   ) {}
 
   private mapToResponse(restaurant: Restaurant): ResponseRestaurantDto {
@@ -92,26 +88,10 @@ export class RestaurantsService {
     return restaurant;
   }
 
-  async findByIdAndOwner(
-    restaurantId: number,
-    ownerId: number,
-  ): Promise<Restaurant | null> {
-    return this.restaurantRepository.findOne({
-      where: {
-        id: restaurantId,
-        owner: {
-          id: ownerId,
-        },
-      },
-    });
-  }
-
-  async create(dto: CreateRestaurantDto) {
-    const owner = await this.usersService.findOneEntity(dto.owner_id);
-
-    if (owner.role !== UserRole.OWNER) {
-      throw new BadRequestException('User is not registered as an owner');
-    }
+  // The owner comes from the access token (routes allow only OWNER), so an
+  // owner can't create a restaurant on someone else's behalf.
+  async create(ownerId: number, dto: CreateRestaurantDto) {
+    const owner = await this.workersService.findOneEntity(ownerId);
 
     const savedId = await this.dataSource.transaction(async (manager) => {
       const restaurant = this.restaurantRepository.create({
@@ -207,6 +187,30 @@ export class RestaurantsService {
     const restaurant = await this.restaurantRepository.findOne({
       where: { id, owner: { id: ownerId } },
       ...(relations && { relations }),
+    });
+
+    if (!restaurant) {
+      throw new RestaurantNotFoundException(id);
+    }
+
+    return restaurant;
+  }
+
+  // Finds a restaurant the given worker may operate: the owner's own
+  // restaurant, or the one a manager/staff member is employed at.
+  async findAccessibleOrThrow(
+    id: number,
+    actor: AuthUser,
+  ): Promise<Restaurant> {
+    if (actor.kind !== AccountKind.WORKER) {
+      throw new RestaurantNotFoundException(id);
+    }
+
+    const restaurant = await this.restaurantRepository.findOne({
+      where:
+        actor.role === WorkerRole.OWNER
+          ? { id, owner: { id: actor.userId } }
+          : { id, employees: { id: actor.userId } },
     });
 
     if (!restaurant) {

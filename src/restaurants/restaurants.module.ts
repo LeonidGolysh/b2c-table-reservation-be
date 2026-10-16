@@ -4,12 +4,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { RestaurantAddresses } from './entity/restaurant-addresses.entity';
 import { RestaurantsController } from './restaurants.controller';
 import { RestaurantsService } from './restaurants.service';
-import { UsersModule } from 'src/users/users.module';
+import { WorkersModule } from 'src/workers/workers.module';
 import { SubscriptionsModule } from 'src/subscriptions/subscriptions.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Restaurant, RestaurantAddresses]),
-    UsersModule,
+    WorkersModule,
     forwardRef(() => SubscriptionsModule),
   ],
   controllers: [RestaurantsController],

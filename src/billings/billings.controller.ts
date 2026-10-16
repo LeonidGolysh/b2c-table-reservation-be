@@ -9,7 +9,10 @@ import {
 } from '@nestjs/common';
 import { BillingsService } from './billings.service';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import type { RequestWithUser } from 'src/auth/strategies/jwt/user.request.interface';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Roles } from 'src/auth/decorator/roles.decorator';
+import { WorkerRole } from 'src/workers/enum/worker-role.enum';
+import type { RequestWithUser } from 'src/auth/strategies/jwt/interface/user.request.interface';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -28,7 +31,8 @@ import { CheckoutResponseDto } from './dto/checkout-response.dto';
 
 @ApiTags('Billings')
 @Controller('billing')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(WorkerRole.OWNER)
 @ApiBearerAuth()
 export class BillingsController {
   constructor(private readonly billingsService: BillingsService) {}
