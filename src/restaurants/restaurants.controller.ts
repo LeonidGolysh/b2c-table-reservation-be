@@ -14,6 +14,7 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiConflictResponse,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOperation,
   ApiQuery,
@@ -27,6 +28,11 @@ import { ErrorResponseDto } from 'src/common/dto/error-response.dto';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Roles } from 'src/auth/decorator/roles.decorator';
+import { CurrentUser } from 'src/auth/decorator/current-user.decorator';
+import type { AuthUser } from 'src/auth/strategies/jwt/interface/user.request.interface';
+import { WorkerRole } from 'src/workers/enum/worker-role.enum';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
 import { ApiPaginatedResponse } from 'src/common/decorator/api-paginated-response.decorator';
@@ -50,11 +56,19 @@ export class RestaurantsController {
     description: 'Restaurant already exists',
     type: ErrorResponseDto,
   })
-  @UseGuards(JwtAuthGuard)
+  @ApiForbiddenResponse({
+    description: 'Only owners can create restaurants',
+    type: ErrorResponseDto,
+  })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(WorkerRole.OWNER)
   @ApiBearerAuth()
   @Post()
-  create(@Body() dto: CreateRestaurantDto): Promise<ResponseRestaurantDto> {
-    return this.restaurantsService.create(dto);
+  create(
+    @Body() dto: CreateRestaurantDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<ResponseRestaurantDto> {
+    return this.restaurantsService.create(user.userId, dto);
   }
 
   @ApiOperation({ summary: 'Get all restaurants' })

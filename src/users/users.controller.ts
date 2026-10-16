@@ -7,14 +7,17 @@ import {
   Delete,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import {
   ApiBadRequestResponse,
+  ApiBearerAuth,
   ApiBody,
   ApiConflictResponse,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOperation,
   ApiQuery,
@@ -27,8 +30,19 @@ import { ValidationErrorResponse } from 'src/common/dto/validation-error-respons
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
 import { ApiPaginatedResponse } from 'src/common/decorator/api-paginated-response.decorator';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Roles } from 'src/auth/decorator/roles.decorator';
+import { WorkerRole } from 'src/workers/enum/worker-role.enum';
 
 @ApiTags('Users')
+@ApiBearerAuth()
+@ApiForbiddenResponse({
+  description: 'Only admins can manage users',
+  type: ErrorResponseDto,
+})
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(WorkerRole.ADMIN)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}

@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,7 +7,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Review } from './review.entity';
 import { FindOptionsOrder, Repository } from 'typeorm';
 import { CreateReviewDto } from './dto/create-review.dto';
-import { UserRole } from 'src/users/user-role.enum';
 import { ResponseReviewsDto } from './dto/response-review.dto';
 import { GetReviewsQueryDto } from './dto/get-reviews-query.dto';
 import { RestaurantsService } from 'src/restaurants/restaurants.service';
@@ -58,10 +56,6 @@ export class ReviewsService {
     const restaurant =
       await this.restaurantsService.findOneEntity(restaurantId);
     const user = await this.usersService.findOneEntity(userId);
-
-    if (user.role !== UserRole.USER) {
-      throw new ForbiddenException('Only users can leave reviews');
-    }
 
     const existing = await this.reviewRepository.findOne({
       where: {

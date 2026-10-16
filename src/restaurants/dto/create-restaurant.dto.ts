@@ -4,7 +4,6 @@ import {
   IsArray,
   IsEnum,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
   ValidateNested,
@@ -23,10 +22,6 @@ export class CreateRestaurantDto {
   @IsString()
   @IsOptional()
   description?: string;
-
-  @ApiProperty({ example: 1 })
-  @IsNumber()
-  owner_id: number;
 
   @ApiProperty({
     enum: SubscriptionPlan,

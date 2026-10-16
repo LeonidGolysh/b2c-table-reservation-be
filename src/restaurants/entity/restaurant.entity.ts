@@ -1,4 +1,4 @@
-import { User } from '../../users/user.entity';
+import { Worker } from '../../workers/worker.entity';
 import {
   Column,
   CreateDateColumn,
@@ -28,9 +28,13 @@ export class Restaurant {
   @Column({ name: 'description', type: 'text', nullable: true })
   description?: string;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => Worker, (worker) => worker.ownedRestaurants)
   @JoinColumn({ name: 'owner_id' })
-  owner: User;
+  owner: Worker;
+
+  // Managers and staff. The owner is not listed here, see `owner`.
+  @OneToMany(() => Worker, (worker) => worker.restaurant)
+  employees: Worker[];
 
   @OneToMany(() => RestaurantAddresses, (address) => address.restaurant)
   addresses: RestaurantAddresses[];

@@ -7,7 +7,6 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
 import { ResponseUserDto } from './dto/response-user.dto';
 import { UserNotFoundException } from './exceptions/user-not-found.exception';
-import { UserRole } from './user-role.enum';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 import {
   getPaginationOptions,
@@ -41,7 +40,6 @@ export class UsersService {
       phone_number: dto.phone_number,
       email: dto.email,
       password: hashedPassword,
-      role: dto.role ?? UserRole.USER,
     });
 
     const savedUser = await this.userRepository.save(user);
