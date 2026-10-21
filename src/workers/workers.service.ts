@@ -27,7 +27,7 @@ export class WorkersService {
       id: worker.id,
       name: worker.name,
       lastname: worker.lastname,
-      phone_number: worker.phone_number,
+      phoneNumber: worker.phoneNumber,
       email: worker.email,
       role: worker.role,
       restaurantId: worker.restaurantId,
@@ -52,7 +52,7 @@ export class WorkersService {
     const worker = this.workerRepository.create({
       name: dto.name,
       lastname: dto.lastname,
-      phone_number: dto.phone_number,
+      phoneNumber: dto.phoneNumber,
       email: dto.email,
       password: await bcrypt.hash(dto.password, 10),
       role,

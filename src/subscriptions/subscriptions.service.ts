@@ -1,5 +1,5 @@
 import {
-  BadRequestException,
+  ConflictException,
   forwardRef,
   Inject,
   Injectable,
@@ -20,7 +20,7 @@ import {
 } from './subscription.constant';
 import { SubscriptionNotFoundException } from './exceptions/subscription-not-found.exception';
 import { MailService } from 'src/mail/mail.service';
-import { PaymentService } from 'src/payments/payments.service';
+import { PaymentsService } from 'src/payments/payments.service';
 
 @Injectable()
 export class SubscriptionsService {
@@ -31,8 +31,7 @@ export class SubscriptionsService {
     @Inject(forwardRef(() => RestaurantsService))
     private readonly restaurantsService: RestaurantsService,
 
-    @Inject(forwardRef(() => PaymentService))
-    private readonly paymentService: PaymentService,
+    private readonly paymentService: PaymentsService,
 
     private readonly subscriptionQueueService: SubscriptionQueueService,
     private readonly mailService: MailService,
@@ -208,7 +207,7 @@ export class SubscriptionsService {
     return savedSubscription;
   }
 
-  async activeSubscription(subscriptionId: number, stripePeriodEnd?: Date) {
+  async activateSubscription(subscriptionId: number, stripePeriodEnd?: Date) {
     const subscription = await this.findByIdOrThrow(subscriptionId, {
       restaurant: true,
     });
@@ -299,7 +298,7 @@ export class SubscriptionsService {
       subscription.status === SubscriptionStatus.CHECKOUT ||
       subscription.status === SubscriptionStatus.ACTIVE
     ) {
-      throw new BadRequestException(
+      throw new ConflictException(
         'Subscription is already in checkout or active',
       );
     }

@@ -20,5 +20,5 @@ export class RegisterDto {
 
   @ApiProperty({ example: '1234567890' })
   @IsString()
-  phone_number: string;
+  phoneNumber: string;
 }

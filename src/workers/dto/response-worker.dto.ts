@@ -12,7 +12,7 @@ export class ResponseWorkerDto {
   lastname: string;
 
   @ApiProperty({ example: '1234567890' })
-  phone_number: string;
+  phoneNumber: string;
 
   @ApiProperty({ example: 'test@gmail.com' })
   email: string;

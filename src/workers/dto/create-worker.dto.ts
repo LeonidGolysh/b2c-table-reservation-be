@@ -18,7 +18,7 @@ export class CreateWorkerDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(10)
-  phone_number: string;
+  phoneNumber: string;
 
   @ApiProperty({ example: 'anna@burgerhouse.com' })
   @IsEmail()

@@ -55,7 +55,7 @@ export class SubscriptionsController {
   })
   @Put(':id/activate')
   activate(@Param('id') id: number) {
-    return this.subscriptionService.activeSubscription(id);
+    return this.subscriptionService.activateSubscription(id);
   }
 
   @ApiOperation({ summary: 'Expire subscription' })

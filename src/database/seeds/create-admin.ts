@@ -27,7 +27,7 @@ async function createAdmin() {
       repository.create({
         name: process.env.ADMIN_NAME ?? 'Admin',
         lastname: process.env.ADMIN_LASTNAME ?? 'Admin',
-        phone_number: process.env.ADMIN_PHONE ?? '0000000000',
+        phoneNumber: process.env.ADMIN_PHONE ?? '0000000000',
         email,
         password: await bcrypt.hash(password, 10),
         role: WorkerRole.ADMIN,

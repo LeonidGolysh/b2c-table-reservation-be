@@ -29,8 +29,8 @@ export class Worker {
   @Column({ length: 50 })
   lastname: string;
 
-  @Column({ length: 10 })
-  phone_number: string;
+  @Column({ name: 'phone_number', length: 10 })
+  phoneNumber: string;
 
   @Column({ unique: true, length: 100 })
   email: string;

@@ -10,7 +10,7 @@ import {
 import { ApiQuery, ApiTags } from '@nestjs/swagger';
 import { MailService } from './mail.service';
 import { SubscriptionPaymentEmailDto } from './dto/subscription-payment-email.dto';
-import { SubscriptionPaymentReminderEmailDto } from './dto/subscripiton-payment-reminder-email.dto';
+import { SubscriptionPaymentReminderEmailDto } from './dto/subscription-payment-reminder-email.dto';
 import { ReservationEmailDto } from './dto/reservation-email.dto';
 import { ConfigService } from '@nestjs/config';
 import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';

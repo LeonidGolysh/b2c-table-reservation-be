@@ -16,7 +16,7 @@ import {
   toPaginatedResponse,
 } from 'src/common/utils/pagination.util';
 import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
-import { OnboardingStatus } from './enum/onboarding-status.emun';
+import { OnboardingStatus } from './enum/onboarding-status.enum';
 import { AccountKind } from 'src/auth/enum/account-kind.enum';
 import { WorkerRole } from 'src/workers/enum/worker-role.enum';
 import type { AuthUser } from 'src/auth/strategies/jwt/interface/user.request.interface';

@@ -17,7 +17,7 @@ import { ValidationErrorResponse } from 'src/common/dto/validation-error-respons
 import { ErrorResponseDto } from 'src/common/dto/error-response.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CustomerGuard, WorkerGuard } from './guards/account-kind.guard';
-import { ResponseCurrentUserDto } from './dto/response-current-user.dto';
+import { ResponseUserDto } from 'src/users/dto/response-user.dto';
 import { CurrentUser } from './decorator/current-user.decorator';
 import type { AuthUser } from './strategies/jwt/interface/user.request.interface';
 import { CreateWorkerDto } from 'src/workers/dto/create-worker.dto';
@@ -68,7 +68,7 @@ export class AuthController {
   @ApiResponse({
     status: 200,
     description: 'Current user data',
-    type: ResponseCurrentUserDto,
+    type: ResponseUserDto,
   })
   @ApiUnauthorizedResponse({
     type: ErrorResponseDto,
@@ -78,7 +78,7 @@ export class AuthController {
     type: ErrorResponseDto,
   })
   @Get('me')
-  me(@CurrentUser() user: AuthUser): Promise<ResponseCurrentUserDto> {
+  me(@CurrentUser() user: AuthUser): Promise<ResponseUserDto> {
     return this.authService.me(user.userId);
   }
 

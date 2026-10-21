@@ -4,7 +4,7 @@ import { StripeService } from './stripe.service';
 import { StripeController } from './stripe.controller';
 import { SubscriptionsModule } from 'src/subscriptions/subscriptions.module';
 import { StripeEvent } from './stripe-event.entity';
-import { PaymentModule } from 'src/payments/payments.module';
+import { PaymentsModule } from 'src/payments/payments.module';
 import { MailModule } from 'src/mail/mail.module';
 import { RestaurantsModule } from 'src/restaurants/restaurants.module';
 
@@ -13,7 +13,7 @@ import { RestaurantsModule } from 'src/restaurants/restaurants.module';
     TypeOrmModule.forFeature([StripeEvent]),
     MailModule,
     SubscriptionsModule,
-    PaymentModule,
+    PaymentsModule,
     RestaurantsModule,
   ],
   providers: [StripeService],

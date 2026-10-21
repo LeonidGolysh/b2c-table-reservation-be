@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from 'src/users/users.service';
+import { ResponseUserDto } from 'src/users/dto/response-user.dto';
 import { WorkersService } from 'src/workers/workers.service';
 import { WorkerRole } from 'src/workers/enum/worker-role.enum';
 import { CreateWorkerDto } from 'src/workers/dto/create-worker.dto';
@@ -21,7 +22,7 @@ export class AuthService {
 
   private sign(payload: JwtPayload): ResponseAuthDto {
     return {
-      access_token: this.jwtService.sign(payload),
+      accessToken: this.jwtService.sign(payload),
     };
   }
 
@@ -84,16 +85,8 @@ export class AuthService {
     });
   }
 
-  async me(userId: number) {
-    const user = await this.userService.findOneEntity(userId);
-
-    return {
-      id: user.id,
-      name: user.name,
-      lastname: user.lastname,
-      phone_number: user.phone_number,
-      email: user.email,
-    };
+  async me(userId: number): Promise<ResponseUserDto> {
+    return this.userService.findOne(userId);
   }
 
   async businessMe(workerId: number) {
