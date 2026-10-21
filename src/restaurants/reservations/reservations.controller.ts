@@ -34,10 +34,15 @@ import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto'
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
 import { ApiPaginatedResponse } from 'src/common/decorator/api-paginated-response.decorator';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Roles } from 'src/auth/decorator/roles.decorator';
+import { WorkerRole } from 'src/workers/enum/worker-role.enum';
+import { CurrentUser } from 'src/auth/decorator/current-user.decorator';
+import type { AuthUser } from 'src/auth/strategies/jwt/interface/user.request.interface';
 
+// Guests book without an account; everything else is for the restaurant's
+// owner and employees.
 @ApiTags('Reservations')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller('restaurants/:restaurantId/reservations')
 export class ReservationsController {
   constructor(private readonly reservationsService: ReservationsService) {}
@@ -52,12 +57,16 @@ export class ReservationsController {
   @ApiPaginatedResponse(ResponseReservationDto)
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(WorkerRole.OWNER, WorkerRole.MANAGER, WorkerRole.STAFF)
+  @ApiBearerAuth()
   @Get()
   async findAll(
     @Param('restaurantId', ParseIntPipe) restaurantId: number,
     @Query() query: PaginationQueryDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<PaginatedResponse<ResponseReservationDto>> {
-    return this.reservationsService.getAll(restaurantId, query);
+    return this.reservationsService.getAll(restaurantId, query, user);
   }
 
   @ApiOperation({ summary: 'Get a reservation by ID' })
@@ -65,12 +74,16 @@ export class ReservationsController {
   @ApiParam({ name: 'reservationId', type: Number })
   @ApiOkResponse({ type: ResponseReservationDto })
   @ApiNotFoundResponse({ description: 'Reservation not found' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(WorkerRole.OWNER, WorkerRole.MANAGER, WorkerRole.STAFF)
+  @ApiBearerAuth()
   @Get(':reservationId')
   async findById(
     @Param('restaurantId', ParseIntPipe) restaurantId: number,
     @Param('reservationId', ParseIntPipe) reservationId: number,
+    @CurrentUser() user: AuthUser,
   ): Promise<ResponseReservationDto> {
-    return this.reservationsService.findById(restaurantId, reservationId);
+    return this.reservationsService.findById(restaurantId, reservationId, user);
   }
 
   @HttpCode(HttpStatus.CREATED)
@@ -93,7 +106,6 @@ export class ReservationsController {
   @ApiBadRequestResponse({
     description: 'Invalid reservation data or start time',
   })
-  @ApiUnauthorizedResponse({ description: 'User is not authenticated' })
   @ApiNotFoundResponse({ description: 'Restaurant not found' })
   @ApiConflictResponse({ description: 'No suitable tables are available' })
   @Post()
@@ -128,29 +140,43 @@ export class ReservationsController {
   @ApiConflictResponse({
     description: 'Reservation cannot be updated or tables are unavailable',
   })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(WorkerRole.OWNER, WorkerRole.MANAGER, WorkerRole.STAFF)
+  @ApiBearerAuth()
   @Patch(':reservationId')
   async update(
     @Param('restaurantId', ParseIntPipe) restaurantId: number,
     @Param('reservationId', ParseIntPipe) reservationId: number,
     @Body() dto: UpdateReservationDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<ResponseReservationDto> {
-    return this.reservationsService.update(restaurantId, reservationId, dto);
+    return this.reservationsService.update(
+      restaurantId,
+      reservationId,
+      dto,
+      user,
+    );
   }
 
   @ApiOperation({ summary: 'Update reservation status' })
   @ApiOkResponse({ type: ResponseReservationDto })
   @ApiNotFoundResponse({ description: 'Reservation not found' })
   @ApiConflictResponse({ description: 'Invalid status transition' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(WorkerRole.OWNER, WorkerRole.MANAGER, WorkerRole.STAFF)
+  @ApiBearerAuth()
   @Patch(':reservationId/status')
   async updateReservationStatus(
     @Param('restaurantId', ParseIntPipe) restaurantId: number,
     @Param('reservationId', ParseIntPipe) reservationId: number,
     @Body() dto: UpdateReservationStatusDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<ResponseReservationDto> {
     return this.reservationsService.updateStatus(
       restaurantId,
       reservationId,
       dto.status,
+      user,
     );
   }
 }

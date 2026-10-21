@@ -244,15 +244,29 @@ export class RestaurantsService {
     await this.restaurantRepository.update(id, { ratingCount, avgRating });
   }
 
-  async update(id: number, dto: UpdateRestaurantDto) {
-    await this.findByIdOrThrow(id);
+  // Admins can manage any restaurant; owners only their own.
+  private async findManageableOrThrow(
+    id: number,
+    actor: AuthUser,
+  ): Promise<Restaurant> {
+    if (actor.role === WorkerRole.ADMIN) {
+      return this.findByIdOrThrow(id);
+    }
+
+    return this.findOwnedByIdOrThrow(id, actor.userId);
+  }
+
+  async update(id: number, dto: UpdateRestaurantDto, actor: AuthUser) {
+    await this.findManageableOrThrow(id, actor);
 
     await this.restaurantRepository.update(id, dto);
 
     return this.findOne(id);
   }
 
-  async remove(id: number) {
+  async remove(id: number, actor: AuthUser) {
+    await this.findManageableOrThrow(id, actor);
+
     const result = await this.restaurantRepository.delete(id);
 
     if (!result.affected) {

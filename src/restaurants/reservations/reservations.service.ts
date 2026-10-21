@@ -25,6 +25,8 @@ import {
   toPaginatedResponse,
 } from 'src/common/utils/pagination.util';
 import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
+import { RestaurantsService } from '../restaurants.service';
+import type { AuthUser } from 'src/auth/strategies/jwt/interface/user.request.interface';
 
 const DEFAULT_DURATION_MINUTES = 120;
 const DEFAULT_BUFFER_MINUTES = 60;
@@ -75,12 +77,16 @@ export class ReservationsService {
     private readonly dataSource: DataSource,
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
+    private readonly restaurantsService: RestaurantsService,
   ) {}
 
   async getAll(
     restaurantId: number,
     query: PaginationQueryDto,
+    actor: AuthUser,
   ): Promise<PaginatedResponse<ResponseReservationDto>> {
+    await this.restaurantsService.findAccessibleOrThrow(restaurantId, actor);
+
     const { skip, take } = getPaginationOptions(query);
 
     // skip/take (not offset/limit) so TypeORM paginates by reservation,
@@ -105,7 +111,10 @@ export class ReservationsService {
   async findById(
     restaurantId: number,
     reservationId: number,
+    actor: AuthUser,
   ): Promise<ResponseReservationDto> {
+    await this.restaurantsService.findAccessibleOrThrow(restaurantId, actor);
+
     const reservation = await this.reservationQuery(this.dataSource.manager)
       .where('restaurant.id = :restaurantId', { restaurantId })
       .andWhere('reservation.id = :reservationId', { reservationId })
@@ -169,10 +178,13 @@ export class ReservationsService {
     restaurantId: number,
     reservationId: number,
     dto: UpdateReservationDto,
+    actor: AuthUser,
   ): Promise<ResponseReservationDto> {
     if (Object.keys(dto).length === 0) {
       throw new BadRequestException('At least one field must be provided');
     }
+
+    await this.restaurantsService.findAccessibleOrThrow(restaurantId, actor);
 
     const reservation = await this.dataSource.transaction(async (manager) => {
       const reservation = await this.lockReservation(
@@ -238,7 +250,10 @@ export class ReservationsService {
     restaurantId: number,
     reservationId: number,
     status: ReservationStatus,
+    actor: AuthUser,
   ): Promise<ResponseReservationDto> {
+    await this.restaurantsService.findAccessibleOrThrow(restaurantId, actor);
+
     const reservation = await this.dataSource.transaction(async (manager) => {
       const reservation = await this.lockReservation(
         manager,

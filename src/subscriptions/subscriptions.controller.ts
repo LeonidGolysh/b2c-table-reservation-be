@@ -1,6 +1,7 @@
-import { Body, Controller, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { SubscriptionsService } from './subscriptions.service';
 import {
+  ApiBearerAuth,
   ApiBody,
   ApiNotFoundResponse,
   ApiOperation,
@@ -10,7 +11,14 @@ import {
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { ResponseSubscriptionDto } from './dto/response-subscription.dto';
 import { ErrorResponseDto } from 'src/common/dto/error-response.dto';
+import { Roles } from 'src/auth/decorator/roles.decorator';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { WorkerRole } from 'src/workers/enum/worker-role.enum';
 
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(WorkerRole.ADMIN)
+@ApiBearerAuth()
 @ApiTags('Subscriptions')
 @Controller('subscriptions')
 export class SubscriptionsController {
