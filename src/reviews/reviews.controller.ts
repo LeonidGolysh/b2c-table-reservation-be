@@ -26,6 +26,9 @@ import { ApiPaginatedResponse } from 'src/common/decorator/api-paginated-respons
 import { GetReviewsQueryDto } from './dto/get-reviews-query.dto';
 import { ErrorResponseDto } from 'src/common/dto/error-response.dto';
 import type { AuthUser } from 'src/auth/strategies/jwt/interface/user.request.interface';
+import { Roles } from 'src/auth/decorator/roles.decorator';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { WorkerRole } from 'src/workers/enum/worker-role.enum';
 
 @Controller('restaurants/:restaurantId/reviews')
 export class ReviewsController {
@@ -76,6 +79,9 @@ export class ReviewsController {
     description: 'Comment not found',
     type: ErrorResponseDto,
   })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(WorkerRole.ADMIN)
+  @ApiBearerAuth()
   @Delete(':id')
   remove(@Param('id') id: number): Promise<{ message: string }> {
     return this.reviewService.remove(+id);

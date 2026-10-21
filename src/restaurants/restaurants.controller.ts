@@ -115,12 +115,16 @@ export class RestaurantsController {
     description: 'Restaurant not found',
     type: ErrorResponseDto,
   })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(WorkerRole.OWNER, WorkerRole.ADMIN)
+  @ApiBearerAuth()
   @Put(':id')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateRestaurantDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<ResponseRestaurantDto> {
-    return this.restaurantsService.update(+id, dto);
+    return this.restaurantsService.update(+id, dto, user);
   }
 
   @ApiOperation({ summary: 'Delete restaurant' })
@@ -137,8 +141,14 @@ export class RestaurantsController {
     description: 'Restaurant not found',
     type: ErrorResponseDto,
   })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(WorkerRole.OWNER, WorkerRole.ADMIN)
+  @ApiBearerAuth()
   @Delete(':id')
-  remove(@Param('id') id: string): Promise<{ message: string }> {
-    return this.restaurantsService.remove(+id);
+  remove(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<{ message: string }> {
+    return this.restaurantsService.remove(+id, user);
   }
 }
