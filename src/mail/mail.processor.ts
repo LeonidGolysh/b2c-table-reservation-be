@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { PaymentService } from 'src/payments/payments.service';
+import { PaymentsService } from 'src/payments/payments.service';
 import { MAIL_JOBS, MAIL_QUEUE } from './mail.constant';
 import { MailService } from './mail.service';
 
@@ -15,7 +15,7 @@ export class MailProcessor extends WorkerHost {
 
   constructor(
     private readonly mailService: MailService,
-    private readonly paymentService: PaymentService,
+    private readonly paymentService: PaymentsService,
   ) {
     super();
   }

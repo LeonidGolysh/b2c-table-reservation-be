@@ -1,5 +1,5 @@
 import {
-  BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -65,7 +65,7 @@ export class ReviewsService {
     });
 
     if (existing) {
-      throw new BadRequestException('You already reviewed this restaurant');
+      throw new ConflictException('You already reviewed this restaurant');
     }
 
     const review = this.reviewRepository.create({

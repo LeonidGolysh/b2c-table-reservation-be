@@ -15,7 +15,7 @@ import { Review } from '../../reviews/review.entity';
 import { Subscription } from '../../subscriptions/subscription.entity';
 import { Payment } from '../../payments/payment.entity';
 import { RestaurantTable } from '../tables/entity/restaurant-table.entity';
-import { OnboardingStatus } from '../enum/onboarding-status.emun';
+import { OnboardingStatus } from '../enum/onboarding-status.enum';
 
 @Entity('restaurants')
 export class Restaurant {

@@ -1,6 +1,6 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
-import { PaymentModule } from 'src/payments/payments.module';
+import { PaymentsModule } from 'src/payments/payments.module';
 import { MAIL_QUEUE } from './mail.constant';
 import { MailProcessor } from './mail.processor';
 import { MailQueueService } from './mail.queue.service';
@@ -12,7 +12,7 @@ import { MailController } from './mail.controller';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Email]),
-    PaymentModule,
+    PaymentsModule,
     BullModule.registerQueue({
       name: MAIL_QUEUE,
     }),

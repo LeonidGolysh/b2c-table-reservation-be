@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Req, Headers } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Post,
+  Req,
+  Headers,
+} from '@nestjs/common';
+import type { RawBodyRequest } from '@nestjs/common';
 import { StripeService } from './stripe.service';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
@@ -18,9 +26,15 @@ export class StripeController {
 
   @Post('webhook')
   async webhook(
-    @Req() req: Request<any, any, Buffer>,
+    @Req() req: RawBodyRequest<Request>,
     @Headers('stripe-signature') signature: string,
   ) {
-    return this.stripeService.handleWebhook(req.body, signature);
+    // Stripe verifies the signature against the exact bytes it sent, so use
+    // the raw body Nest keeps (rawBody: true in main.ts), not the parsed JSON.
+    if (!req.rawBody) {
+      throw new BadRequestException('Missing request body');
+    }
+
+    return this.stripeService.handleWebhook(req.rawBody, signature);
   }
 }

@@ -6,7 +6,7 @@ import { Subscription } from 'src/subscriptions/subscription.entity';
 import { SubscriptionsService } from 'src/subscriptions/subscriptions.service';
 import { Repository } from 'typeorm';
 import { StripeEvent } from './stripe-event.entity';
-import { PaymentService } from 'src/payments/payments.service';
+import { PaymentsService } from 'src/payments/payments.service';
 import { MailQueueService } from 'src/mail/mail.queue.service';
 import { InvoiceWithSubscription } from 'src/subscriptions/interface/invoice-subscription.interface';
 import { RestaurantsService } from 'src/restaurants/restaurants.service';
@@ -21,7 +21,7 @@ export class StripeService {
     private stripeEvent: Repository<StripeEvent>,
 
     private readonly subscriptionService: SubscriptionsService,
-    private readonly paymentService: PaymentService,
+    private readonly paymentService: PaymentsService,
     private readonly mailQueueService: MailQueueService,
     private readonly restaurantService: RestaurantsService,
   ) {
@@ -86,11 +86,19 @@ export class StripeService {
   }
 
   async handleWebhook(body: Buffer, signature: string) {
-    const event = this.client.webhooks.constructEvent(
-      body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET!,
-    );
+    let event: Stripe.Event;
+
+    // constructEvent throws on a missing or invalid signature; answer 400 so
+    // Stripe doesn't treat it as a server failure.
+    try {
+      event = this.client.webhooks.constructEvent(
+        body,
+        signature,
+        process.env.STRIPE_WEBHOOK_SECRET!,
+      );
+    } catch {
+      throw new BadRequestException('Invalid Stripe signature');
+    }
 
     switch (event.type) {
       case 'checkout.session.completed':
@@ -204,15 +212,18 @@ export class StripeService {
     const stripePeriodEnd =
       await this.getSubscriptionPeriodEnd(stripeSubscriptionId);
 
-    const payment = await this.paymentService.createFromCheckout(session);
+    const subscription =
+      await this.subscriptionService.findById(subscriptionId);
 
-    await this.subscriptionService.activeSubscription(
+    const payment = await this.paymentService.createFromCheckout(
+      session,
+      subscription,
+    );
+
+    await this.subscriptionService.activateSubscription(
       Number(subscriptionId),
       stripePeriodEnd,
     );
-
-    const subscription =
-      await this.subscriptionService.findById(subscriptionId);
 
     await this.restaurantService.completeOnboarding(subscription.restaurant.id);
 
@@ -263,7 +274,7 @@ export class StripeService {
       subscription.stripeSubscriptionId,
     );
 
-    await this.paymentService.createFromInvoice(invoice);
+    await this.paymentService.createFromInvoice(invoice, subscription);
     await this.subscriptionService.renewSubscription(
       subscription.id,
       stripePeriodEnd,

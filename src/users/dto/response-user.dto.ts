@@ -11,7 +11,7 @@ export class ResponseUserDto {
   lastname: string;
 
   @ApiProperty({ example: '1234567890' })
-  phone_number: string;
+  phoneNumber: string;
 
   @ApiProperty({ example: 'john@gmail.com' })
   email: string;

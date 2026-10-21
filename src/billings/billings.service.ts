@@ -4,7 +4,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { PaymentService } from 'src/payments/payments.service';
+import { PaymentsService } from 'src/payments/payments.service';
 import { RestaurantsService } from 'src/restaurants/restaurants.service';
 import { BillingRestaurantResponseDto } from './dto/billing-restaurant-response.dto';
 import { PaymentResponseDto } from './dto/payment-response.dto';
@@ -22,7 +22,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export class BillingsService {
   constructor(
     private readonly restaurantsService: RestaurantsService,
-    private readonly paymentService: PaymentService,
+    private readonly paymentService: PaymentsService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly stripeService: StripeService,
   ) {}

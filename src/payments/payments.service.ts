@@ -1,7 +1,5 @@
 import {
   BadRequestException,
-  forwardRef,
-  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,17 +8,14 @@ import Stripe from 'node_modules/stripe/esm/stripe.esm.node';
 import { Repository } from 'typeorm';
 import { Payment } from './payment.entity';
 import { PaymentStatus } from './payment-status.enum';
-import { SubscriptionsService } from 'src/subscriptions/subscriptions.service';
+import { Subscription } from 'src/subscriptions/subscription.entity';
 import { InvoiceWithSubscription } from 'src/subscriptions/interface/invoice-subscription.interface';
 
 @Injectable()
-export class PaymentService {
+export class PaymentsService {
   constructor(
     @InjectRepository(Payment)
     private paymentRepository: Repository<Payment>,
-
-    @Inject(forwardRef(() => SubscriptionsService))
-    private readonly subscriptionsService: SubscriptionsService,
   ) {}
 
   async findLatestSuccessfulPaymentBySubscriptionId(
@@ -66,7 +61,12 @@ export class PaymentService {
     });
   }
 
-  async createFromCheckout(session: Stripe.Checkout.Session) {
+  // The caller resolves the subscription (with its restaurant) so this module
+  // doesn't depend on SubscriptionsModule.
+  async createFromCheckout(
+    session: Stripe.Checkout.Session,
+    subscription: Subscription,
+  ) {
     if (session.payment_status !== 'paid') {
       throw new BadRequestException('Checkout payment is not completed');
     }
@@ -78,15 +78,6 @@ export class PaymentService {
     if (existing) {
       return existing;
     }
-
-    const subscriptionId = Number(session.metadata?.subscriptionId);
-
-    if (!Number.isInteger(subscriptionId) || subscriptionId <= 0) {
-      throw new BadRequestException('Invalid subscription data in metadata');
-    }
-
-    const subscription =
-      await this.subscriptionsService.findById(subscriptionId);
 
     const payment = this.paymentRepository.create({
       subscription,
@@ -104,7 +95,10 @@ export class PaymentService {
     return await this.paymentRepository.save(payment);
   }
 
-  async createFromInvoice(invoice: Stripe.Invoice & InvoiceWithSubscription) {
+  async createFromInvoice(
+    invoice: Stripe.Invoice & InvoiceWithSubscription,
+    subscription: Subscription,
+  ) {
     const existing = await this.paymentRepository.findOne({
       where: { stripeInvoiceId: invoice.id },
     });
@@ -119,11 +113,6 @@ export class PaymentService {
     if (!stripeSubscriptionId) {
       throw new NotFoundException('No Stripe subscription id');
     }
-
-    const subscription =
-      await this.subscriptionsService.findByStripeSubscriptionIdOrThrow(
-        stripeSubscriptionId,
-      );
 
     const payment = this.paymentRepository.create({
       subscription,

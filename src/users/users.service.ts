@@ -29,7 +29,7 @@ export class UsersService {
       id: user.id,
       name: user.name,
       lastname: user.lastname,
-      phone_number: user.phone_number,
+      phoneNumber: user.phoneNumber,
       email: user.email,
     };
   }
@@ -40,7 +40,7 @@ export class UsersService {
     const user = this.userRepository.create({
       name: dto.name,
       lastname: dto.lastname,
-      phone_number: dto.phone_number,
+      phoneNumber: dto.phoneNumber,
       email: dto.email,
       password: hashedPassword,
     });
