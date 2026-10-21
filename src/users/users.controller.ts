@@ -34,6 +34,8 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/decorator/roles.decorator';
 import { WorkerRole } from 'src/workers/enum/worker-role.enum';
+import { CurrentUser } from 'src/auth/decorator/current-user.decorator';
+import type { AuthUser } from 'src/auth/strategies/jwt/interface/user.request.interface';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -118,9 +120,15 @@ export class UsersController {
       },
     },
   })
+  // Overrides the class-level admin-only rule; ownership is checked in the service.
+  @Roles()
   @Put(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
-    return this.usersService.update(+id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.usersService.update(+id, dto, user);
   }
 
   @ApiOperation({ summary: 'Delete user' })

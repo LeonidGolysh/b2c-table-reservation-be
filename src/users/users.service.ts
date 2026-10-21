@@ -13,6 +13,9 @@ import {
   toPaginatedResponse,
 } from 'src/common/utils/pagination.util';
 import { PaginatedResponse } from 'src/common/interface/paginated-response.interface';
+import { AccountKind } from 'src/auth/enum/account-kind.enum';
+import { WorkerRole } from 'src/workers/enum/worker-role.enum';
+import type { AuthUser } from 'src/auth/strategies/jwt/interface/user.request.interface';
 
 @Injectable()
 export class UsersService {
@@ -92,8 +95,32 @@ export class UsersService {
     return user;
   }
 
-  async update(id: number, dto: UpdateUserDto): Promise<ResponseUserDto> {
-    await this.userRepository.update(id, dto);
+  // Admins can update any user; customers only themselves.
+  private assertCanManage(id: number, actor: AuthUser) {
+    if (actor.role === WorkerRole.ADMIN) {
+      return;
+    }
+
+    if (actor.kind !== AccountKind.USER || actor.userId !== id) {
+      throw new UserNotFoundException(id);
+    }
+  }
+
+  async update(
+    id: number,
+    dto: UpdateUserDto,
+    actor: AuthUser,
+  ): Promise<ResponseUserDto> {
+    this.assertCanManage(id, actor);
+    await this.findOneEntity(id);
+
+    const data: Partial<User> = { ...dto };
+
+    if (dto.password) {
+      data.password = await bcrypt.hash(dto.password, 10);
+    }
+
+    await this.userRepository.update(id, data);
 
     return this.findOne(id);
   }
