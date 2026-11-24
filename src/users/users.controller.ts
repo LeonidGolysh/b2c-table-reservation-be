@@ -8,6 +8,7 @@ import {
   Put,
   Query,
   UseGuards,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -96,8 +97,8 @@ export class UsersController {
     type: ErrorResponseDto,
   })
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(+id);
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.findOne(id);
   }
 
   @ApiOperation({ summary: 'Updated user' })
@@ -124,19 +125,19 @@ export class UsersController {
   @Roles()
   @Put(':id')
   update(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateUserDto,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.usersService.update(+id, dto, user);
+    return this.usersService.update(id, dto, user);
   }
 
-  @ApiOperation({ summary: 'Delete user' })
+  @ApiOperation({ summary: 'Remove user' })
   @ApiResponse({
     status: 200,
     schema: {
       example: {
-        message: 'User deleted successfully',
+        message: 'User removed successfully',
       },
     },
   })
@@ -145,7 +146,7 @@ export class UsersController {
     type: ErrorResponseDto,
   })
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(+id);
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.remove(id);
   }
 }
